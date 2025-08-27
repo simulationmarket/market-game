@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investigación y Desarrollo</title>
+    <link rel="stylesheet" href="investigacion_desarrollo.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="investigacion_desarrollo.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Investigación y Desarrollo</h1>
+
+        <!-- Selector de modo: Desarrollar o Mejorar -->
+        <div class="mode-selector">
+            <label class="btn-blue"><input type="radio" name="modo" value="nuevo" checked> Desarrollar producto</label>
+            <label class="btn-blue"><input type="radio" name="modo" value="mejora"> Mejorar producto</label>
+        </div>
+
+        <!-- Contenedor select productos existentes -->
+        <div id="product-select-container" class="product-creation hidden">
+            <h2>Mejorar Producto</h2>
+            <label for="product-select">Selecciona producto existente:</label>
+            <select id="product-select">
+                <!-- Opciones cargadas dinámicamente -->
+            </select>
+        </div>
+
+        <div id="budget-container">
+            <h2>Presupuesto Actual: <span id="budgetAmount">0 €</span></h2>
+        </div>
+
+        <div class="content">
+            <!-- Zona de creación o mejora -->
+            <div class="product-creation">
+                <h2 id="section-title">Características del Producto</h2>
+                <div class="characteristics">
+                    <!-- Sliders de características -->
+                    <div class="characteristic">
+                        <label for="pantalla">Pantalla</label>
+                        <input type="range" id="pantalla" name="pantalla" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="procesador">Procesador</label>
+                        <input type="range" id="procesador" name="procesador" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="bateria">Batería</label>
+                        <input type="range" id="bateria" name="bateria" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="placaBase">Placa Base</label>
+                        <input type="range" id="placaBase" name="placaBase" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="ergonomia">Ergonomía</label>
+                        <input type="range" id="ergonomia" name="ergonomia" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="acabados">Acabados</label>
+                        <input type="range" id="acabados" name="acabados" min="1" max="20" value="10">
+                    </div>
+                    <div class="characteristic">
+                        <label for="color">Color</label>
+                        <input type="range" id="color" name="color" min="1" max="20" value="10">
+                    </div>
+                </div>
+                <button class="btn-blue generar-proyecto" id="generar-proyecto-btn">Generar Proyecto</button>
+            </div>
+
+            <!-- Resumen de costes -->
+            <div class="cost-display">
+                <h2>Resumen de Costes</h2>
+                <table>
+                    <tr>
+                        <th>Concepto</th>
+                        <th>Costo</th>
+                    </tr>
+                    <tr>
+                        <td>Coste de Desarrollo del Proyecto</td>
+                        <td id="cost-display">0,00 €</td>
+                    </tr>
+                    <tr>
+                        <td>Coste Unitario Estimado</td>
+                        <td id="unit-cost-display">0,00 €</td>
+                    </tr>
+                    <tr>
+                        <td>Tiempo de Ejecución</td>
+                        <td id="execution-time-display">0 rondas</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Proyectos en desarrollo -->
+            <div class="development-projects">
+                <h2>Proyectos en Desarrollo</h2>
+                <table id="development-projects-list">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Tiempo Restante</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Lista de proyectos en desarrollo -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button id="back-button" class="btn-blue">Volver</button>
+        </div>
+    </div>
+
+    <!-- Diálogo modal para ingresar nombre y descripción -->
+    <div id="project-dialog" class="dialog hidden">
+        <h2 id="dialog-title">Nuevo Proyecto</h2>
+        <label for="project-name">Nombre del Producto</label>
+        <input type="text" id="project-name">
+        <label for="project-description">Descripción</label>
+        <input type="text" id="project-description">
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+            <button class="btn" id="cancelar-proyecto-btn">Cancelar</button>
+            <button class="btn-blue" id="aceptar-proyecto-btn">Aceptar</button>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,54 @@
+body {
+  background-color: #111;
+  color: white;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  padding: 30px;
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 40px;
+  font-size: 2em;
+  color: #00ffff;
+}
+
+.charts-wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.chart-block {
+  background-color: #222;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+canvas {
+  width: 100% !important;
+  height: 400px !important;
+}
+
+#volver-btn {
+  margin-top: 50px;
+  padding: 12px 30px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: #00ffff;
+  color: #000;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+#volver-btn:hover {
+  background-color: #00bbbb;
+}

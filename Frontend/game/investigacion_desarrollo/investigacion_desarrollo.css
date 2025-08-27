@@ -1,0 +1,127 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(to right, #8e44ad, #3498db);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100vh;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    width: 80%; /* Aumentado ligeramente para aprovechar más el ancho */
+    max-width: 1100px; /* Ajuste del ancho máximo */
+    margin: 0 auto;
+    overflow: auto;
+}
+
+h1, h2 {
+    color: #fff;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.product-creation, .cost-display {
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    padding: 20px;
+    border-radius: 10px;
+    width: 100%;
+}
+
+.characteristics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px; /* Aumentar el espacio entre los selectores */
+    margin-bottom: 20px; /* Añadir margen inferior */
+}
+
+.characteristic {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.characteristic label {
+    font-weight: bold;
+    margin-right: 10px;
+    flex: 1;
+}
+
+.characteristic input[type="range"] {
+    width: 75%; /* Aumentado para que los selectores sean más largos */
+}
+
+table {
+    width: 95%; /* Ajustar para que no esté tan pegado a los bordes */
+    margin: 0 auto; /* Centrar la tabla */
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background-color: #3498db;
+    color: white;
+}
+
+td {
+    background-color: #f2f2f2;
+    color: #000;
+}
+
+/* Ajustes para el diálogo modal */
+.dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(50, 50, 50, 0.95);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    color: #fff;
+    width: 50%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Estilo azul para los botones */
+.btn-blue {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+}
+
+.btn-blue:hover {
+    background-color: #0056b3;
+}

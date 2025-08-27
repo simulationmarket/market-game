@@ -1,0 +1,32 @@
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+
+const { router: playerRoutes, players } = require('./routes/players');
+const handlePlayerSockets = require('./sockets/playersSocket');
+const handleMarket = require('./sockets/market'); // Importar market.js
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 3000;
+const MAX_PLAYERS = 2; // Cambiar a 4 para pruebas con más jugadores
+
+// Servir archivos estáticos desde la carpeta frontend
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Usar rutas separadas
+app.use('/api', playerRoutes);
+
+// Manejar sockets de jugadores
+handlePlayerSockets(io, players, MAX_PLAYERS);
+
+// Manejar sockets del mercado
+handleMarket(io); // Llamamos a la función de market.js para manejar la lógica del mercado
+
+// Confirmar que el servidor está escuchando
+server.listen(PORT, () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
+});

@@ -1,0 +1,119 @@
+/* Fondo y estilo general */
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(to right, #8e44ad, #3498db);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    height: 100vh;
+}
+
+/* Contenedor principal */
+.container {
+    width: 80%;
+    max-width: 900px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    margin-top: 20px;
+    overflow: auto;
+}
+
+/* Título de la pantalla */
+h1 {
+    text-align: center;
+    font-size: 2em;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+/* Estilo de la tabla */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+th, td {
+    padding: 15px 20px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+thead {
+    background-color: #333;
+    color: #fff;
+}
+
+/* Estilo para partidas principales */
+.expandable {
+    background-color: #444;
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.1em;
+    cursor: pointer;
+}
+
+.expandable:hover {
+    background-color: #555;
+}
+
+.toggle-icon {
+    float: right;
+    font-weight: bold;
+}
+
+/* Estilos de color para las partidas */
+.positivo {
+    color: #4caf50; /* Verde para valores positivos o ingresos */
+}
+
+.negativo {
+    color: #ff4d4f; /* Rojo para valores negativos o gastos */
+}
+
+/* Detalles ocultos */
+.detalle {
+    display: none;
+    background-color: #f9f9f9;
+    padding-left: 20px;
+    font-style: italic;
+    color: #333;
+}
+
+.detalle ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.detalle li {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Botón Volver */
+.volver-btn {
+    width: 100%;
+    max-width: 200px;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    color: #fff;
+    background-color: #3498db;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.volver-btn:hover {
+    background-color: #2980b9;
+}

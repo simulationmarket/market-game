@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segmentos - Mercado Potencial</title>
+    <link rel="stylesheet" href="segmentos.css">
+    <!-- Asegúrate de que solo está enlazado el archivo JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Segmentación del Mercado</h1>
+
+        <!-- Gráficos de Barras Apiladas por Segmento -->
+        <h2>Estudio poblacional</h2>
+        <div class="row">
+            <div>
+                <h3>Profesionales</h3>
+                <canvas id="barChartProfesionales"></canvas>
+            </div>
+            <div>
+                <h3>Altos Ingresos</h3>
+                <canvas id="barChartAltosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Gran Consumidor</h3>
+                <canvas id="barChartGranConsumidor"></canvas>
+            </div>
+            <div>
+                <h3>Bajos Ingresos</h3>
+                <canvas id="barChartBajosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Innovadores</h3>
+                <canvas id="barChartInnovadores"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráficos de Radar por Segmento -->
+        <h2>Estudio de Atributos</h2>
+        <div class="row">
+            <div>
+                <h3>Profesionales</h3>
+                <canvas id="radarChartProfesionales"></canvas>
+            </div>
+            <div>
+                <h3>Altos Ingresos</h3>
+                <canvas id="radarChartAltosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Gran Consumidor</h3>
+                <canvas id="radarChartGranConsumidor"></canvas>
+            </div>
+            <div>
+                <h3>Bajos Ingresos</h3>
+                <canvas id="radarChartBajosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Innovadores</h3>
+                <canvas id="radarChartInnovadores"></canvas>
+            </div>
+        </div>
+
+        <!-- Nueva Sección: Curva de Sensibilidad -->
+        <h2>Curva de Sensibilidad</h2>
+        <div class="row">
+            <div>
+                <h3>Profesionales</h3>
+                <canvas id="sensitivityChartProfesionales"></canvas>
+            </div>
+            <div>
+                <h3>Altos Ingresos</h3>
+                <canvas id="sensitivityChartAltosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Gran Consumidor</h3>
+                <canvas id="sensitivityChartGranConsumidor"></canvas>
+            </div>
+            <div>
+                <h3>Bajos Ingresos</h3>
+                <canvas id="sensitivityChartBajosIngresos"></canvas>
+            </div>
+            <div>
+                <h3>Innovadores</h3>
+                <canvas id="sensitivityChartInnovadores"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- El archivo JS debe estar enlazado correctamente -->
+    <script src="segmentos.js"></script>
+</body>
+</html>

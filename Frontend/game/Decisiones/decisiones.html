@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="decisiones.css">
+    <title>Decisiones del Jugador</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Decisiones del Jugador</h1>
+
+        <!-- Presupuesto Actual -->
+        <div class="block">
+            <h2>Presupuesto Actual: <span id="presupuesto-actual">0 €</span></h2>
+        </div>
+
+        <!-- Sección de Precios, Producción y Posicionamiento -->
+        <div class="block">
+            <h2>Precios, Producción y Posicionamiento</h2>
+            <div id="productos-container">
+                <!-- Los bloques de productos se generarán dinámicamente aquí -->
+            </div>
+        </div>
+
+        <!-- Sección de Decisiones de Canal -->
+        <div class="block-canales">
+            <h2>Decisiones de Canal</h2>
+            <div class="input-group">
+                <label>Gran Distribución (Coste por unidad: 75.000 €):</label>
+                <input type="number" id="gran-distribucion" value="0">
+            </div>
+            <div class="input-group">
+                <label>Minoristas (Coste por unidad: 115.000 €):</label>
+                <input type="number" id="minoristas" value="0">
+            </div>
+            <div class="input-group">
+                <label>Online (Coste por unidad: 150.000 €):</label>
+                <input type="number" id="online" value="0">
+            </div>
+            <div class="input-group">
+                <label>Tienda Propia (Coste por unidad: 300.000 €):</label>
+                <input type="number" id="tienda-propia" value="0">
+            </div>
+            <div class="input-group">
+                <label>Presupuesto Total de Canales (€):</label>
+                <span id="presupuesto-total">0 €</span>
+            </div>
+        </div>
+           
+
+        <!-- Botón para guardar decisiones -->
+        <button id="guardar-decisiones">Guardar Decisiones</button>
+
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="decisiones.js"></script>
+    </div>
+</body>
+</html>
+
+

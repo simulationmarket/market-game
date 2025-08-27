@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe de Ventas</title>
+    <link rel="stylesheet" href="ventas.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Informe de Ventas</h1>
+    </header>
+
+    <main>
+        <!-- Sección: Ventas por producto y canal (General) -->
+        <section id="ventas-por-producto">
+            <h2>Ventas por Canal</h2>
+            <div id="tabla-productos-canales"></div>
+        </section>
+
+        <!-- Sección: Ventas por segmento (General) -->
+        <section id="ventas-por-segmento">
+            <h2>Ventas por Segmento</h2>
+            <canvas id="ventasSegmentoChart"></canvas>
+        </section>
+
+        <!-- Sección: Evolución de ventas (General) -->
+        <section id="evolucion-ventas">
+            <h2>Evolución de Ventas por Ronda</h2>
+            <canvas id="evolucionVentasChart"></canvas>
+        </section>
+
+        <!-- Sección: Cuota de mercado por segmento (General) -->
+        <section id="cuota-por-segmento">
+            <h2>Cuota de Mercado por Segmento</h2>
+            <div id="tabla-cuota-segmento"></div>
+        </section>
+
+        <!-- Sección: Cuota de mercado por canal (General) -->
+        <section id="cuota-por-canal">
+            <h2>Cuota de Mercado por Canal</h2>
+            <div id="tabla-cuota-canal"></div>
+        </section>
+
+        <!-- Secciones por producto -->
+        <section id="detalle-por-producto">
+            <h2>Detalle por Producto</h2>
+            <div id="contenedor-productos"></div>
+        </section>
+    </main>
+
+    <script src="ventas.js"></script>
+</body>
+</html>

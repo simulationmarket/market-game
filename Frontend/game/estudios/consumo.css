@@ -1,0 +1,72 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(to right, #8e44ad, #3498db);
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.container {
+    width: 95%;
+    max-width: 1800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px; /* Espaciado entre secciones */
+}
+
+.chart-container {
+    position: relative;
+    height: 600px; /* Altura suficiente para el gráfico principal */
+    width: 100%;
+    max-width: 1700px;
+    margin: 0 auto;
+    background-color: #333;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+h1, h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    gap: 20px; /* Espaciado entre los gráficos */
+}
+
+.chart-item {
+    flex: 1 1 calc(30% - 20px); /* Cada gráfico ocupa aproximadamente el 30% del ancho disponible */
+    max-width: 400px; /* Máximo ancho de cada gráfico */
+    height: 350px;
+    background-color: #222;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-item canvas {
+    width: 100%; /* Asegura que el canvas se ajuste al contenedor */
+    height: 100%; /* Ajusta la altura automáticamente */
+}
+
+.chart-item h3 {
+    margin-bottom: 10px;
+    font-size: 1.5rem;
+    color: #fff;
+}

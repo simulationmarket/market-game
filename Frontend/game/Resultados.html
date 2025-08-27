@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resultados</title>
+  <link rel="stylesheet" href="Resultados.css"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Resultados de los Jugadores</h1>
+
+    <div class="charts-wrapper">
+      <div class="chart-block"><canvas id="facturacionChart"></canvas></div>
+      <div class="chart-block"><canvas id="margenBrutoChart"></canvas></div>
+      <div class="chart-block"><canvas id="baiiChart"></canvas></div>
+      <div class="chart-block"><canvas id="resultadoNetoChart"></canvas></div>
+      <div class="chart-block"><canvas id="valorAccionChart"></canvas></div>
+    </div>
+
+    <button id="volver-btn">🔙 Volver</button>
+  </div>
+
+  <script src="Resultados.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Simulation Game</title>
+  <link rel="stylesheet" href="index.css">
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container fade-in">
+    <img src="logo.png" alt="Logo del juego" class="logo" />
+    <h1>Bienvenido al Juego de Simulación de Mercado</h1>
+    <label for="playerName">Nombre de la Empresa:</label>
+    <input type="text" id="playerName" placeholder="Escribe tu nombre...">
+    <button id="readyButton">Estoy Listo</button>
+    <div id="status" class="status-text"></div>
+    <div id="temporizador" class="status-text" style="margin-top: 10px;"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>

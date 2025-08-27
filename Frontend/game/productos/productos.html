@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos</title>
+    <link rel="stylesheet" href="productos.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="productos.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Productos</h1>
+        <div id="productos-lista" class="productos-grid"></div>
+
+        <!-- Botón para volver a la pantalla principal -->
+        <button id="back-button" class="btn-volver">Volver</button>
+    </div>
+
+    <script>
+        document.querySelector("#back-button").addEventListener("click", () => {
+            window.location.href = "../game.html";  // Cambia la URL según sea necesario
+        });
+    </script>
+</body>
+</html>

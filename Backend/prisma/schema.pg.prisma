@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Partida {
+  id          String     @id @default(cuid())
+  codigo      String     @unique
+  estado      String
+  rondaActual Int        @default(0)
+  createdAt   DateTime   @default(now())
+
+  jugadores        Jugador[]
+  rondas           Ronda[]
+  decisiones       Decision[]
+  resultadosRonda  ResultadoRonda[]
+}
+
+model Jugador {
+  id         String    @id @default(cuid())
+  nombre     String
+  esBot      Boolean   @default(false)
+  budget     Float     @default(0)
+  createdAt  DateTime  @default(now())
+
+  partidaId  String
+  partida    Partida   @relation(fields: [partidaId], references: [id])
+
+  decisiones Decision[]
+
+  @@unique([partidaId, nombre], name: "jugador_unico_en_partida")
+}
+
+model Ronda {
+  id         String    @id @default(cuid())
+  numero     Int
+  createdAt  DateTime  @default(now())
+
+  partidaId  String
+  partida    Partida   @relation(fields: [partidaId], references: [id])
+
+  decisiones      Decision[]
+  resultadosRonda ResultadoRonda[]
+
+  @@unique([partidaId, numero], name: "ronda_unica_por_partida")
+}
+
+model Decision {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+
+  jugadorId  String
+  jugador    Jugador   @relation(fields: [jugadorId], references: [id])
+
+  partidaId  String
+  partida    Partida   @relation(fields: [partidaId], references: [id])
+
+  rondaId    String
+  ronda      Ronda     @relation(fields: [rondaId], references: [id])
+
+  data       Json
+
+  @@index([partidaId, rondaId, jugadorId])
+}
+
+model ResultadoRonda {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  partidaId  String
+  partida    Partida  @relation(fields: [partidaId], references: [id])
+
+  rondaId    String
+  ronda      Ronda    @relation(fields: [rondaId], references: [id])
+
+  data       Json
+
+  @@unique([partidaId, rondaId], name: "resultado_unico_por_ronda")
+}

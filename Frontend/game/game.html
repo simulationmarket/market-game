@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game</title>
+    <link rel="stylesheet" href="game.css">
+</head>
+<body>
+    <div class="top-bar">
+       
+        <span id="ronda">Ronda:</span> 
+        <button id="submit_decisions">Enviar Decisiones</button>
+        <div id="budget">Presupuesto: <span id="budgetAmount" class="positive">130.000.000 €</span></div>
+        <div id="reservas">Reservas: <span id="reservesAmount" class="positive">0 €</span></div>
+
+        <!-- Ajuste de los IDs para que coincidan con game.js -->
+        <button id="addReserve">Añadir a Reservas</button>
+        <button id="removeReserve">Quitar de Reservas</button>
+    </div>
+    <div class="container">
+        <div class="sidebar">
+            <button onclick="location.href='./informacion_financiera/informacion_financiera.html'">Información Financiera</button>
+            <button onclick="location.href='./estudios/estudios.html'">Estudios</button>
+            <button onclick="location.href='./investigacion_desarrollo/investigacion_desarrollo.html'">I+D</button>
+            <button onclick="location.href='./productos/productos.html'">Productos</button>
+            <button onclick="location.href='./banco/banco.html'">Banco</button>
+            <button onclick="location.href='./decisiones/decisiones.html'">Decisiones</button>
+            <button onclick="location.href='./proyeccion/proyeccion.html'">Proyección</button>
+        </div>
+    </div>
+
+    <!-- Cuadro de diálogo de confirmación para enviar decisiones -->
+    <div id="confirmationDialog" class="hidden">
+        <p>¿Estás seguro que quieres enviar las decisiones para esta Ronda? Si aceptas ya no las podrás modificar.</p>
+        <button id="confirmSubmit">Aceptar</button>
+        <button id="cancelSubmit">Cancelar</button>
+    </div>
+    <!-- Pantalla de espera hasta que todos los jugadores estén listos -->
+    <div id="waitingForOthersScreen" class="hidden">
+    <p>Esperando a los demás jugadores...</p>
+    </div>
+    <!-- Pantalla de cálculo de resultados -->
+    <div id="calculatingResultsScreen" class="hidden">
+        <h1>Calculando Resultados de Ronda</h1>
+    </div>
+
+    <!-- Cuadro de diálogo de confirmación para reservas -->
+    <div id="reservasDialog" class="hidden">
+        <p id="reservasDialogText"></p>
+        <button id="confirmReservas">Aceptar</button>
+        <button id="cancelReservas">Cancelar</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
