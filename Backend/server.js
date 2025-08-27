@@ -56,11 +56,23 @@ console.log('GameService TEST -> estado:', io.gameService.getEstado());
 // Sirve estáticos (index.html dentro de ./frontend)
 // AHORA (apunta a la carpeta hermana ../frontend)
 
-app.use(express.static(path.resolve(__dirname, '../frontend')));
 
-// (opcional recomendado) servir index por defecto en "/"
-app.get('/', (req, res) => {
-  res.sendFile(path.resolve(__dirname, '../frontend/index.html'));
+
+// 👇 ya lo tienes
+app.use(express.static(path.resolve(__dirname, '../Frontend')));
+
+// ✅ rutas directas a las páginas
+app.get('/game', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../Frontend/game/game.html'));
+});
+
+app.get('/benchmark', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../Frontend/game/estudios/benchmark.html'));
+});
+
+// (opcional) fallback para rutas desconocidas al index
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../Frontend/index.html'));
 });
 
 // API
