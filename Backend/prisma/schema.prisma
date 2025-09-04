@@ -4,78 +4,78 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  // Guarda el archivo dentro de la carpeta prisma para orden:
+  url      = "file:./prisma/dev.db"
 }
 
 model Partida {
-  id          String   @id @default(cuid())
-  codigo      String   @unique
-  estado      String
-  rondaActual Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           Int              @id @default(autoincrement())
+  codigo       String           @unique
+  estado       String
+  rondaActual  Int              @default(0)
 
-  jugadores       Jugador[]
-  rondas          Ronda[]
-  decisiones      Decision[]
-  resultadosRonda ResultadoRonda[]
+  rondas       Ronda[]
+  jugadores    Jugador[]
+  decisiones   Decision[]
+  resultados   ResultadoRonda[]
+
+  createdAt    DateTime         @default(now())
 }
 
 model Jugador {
-  id        String   @id @default(cuid())
-  nombre    String
-  esBot     Boolean  @default(false)
-  budget    Float    @default(0)
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  nombre     String
+  esBot      Boolean   @default(false)
+  budget     Int       @default(0)
 
-  partidaId String
-  partida   Partida @relation(fields: [partidaId], references: [id])
+  partidaId  Int
+  partida    Partida   @relation(fields: [partidaId], references: [id])
 
   decisiones Decision[]
+
+  createdAt  DateTime  @default(now())
 }
 
 model Ronda {
-  id        String   @id @default(cuid())
-  numero    Int
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  numero     Int
 
-  partidaId String
-  partida   Partida @relation(fields: [partidaId], references: [id])
+  partidaId  Int
+  partida    Partida   @relation(fields: [partidaId], references: [id])
 
-  decisiones      Decision[]
-  resultadosRonda ResultadoRonda[]
+  decisiones Decision[]
+  resultados ResultadoRonda[]
+
+  createdAt  DateTime  @default(now())
 
   @@unique([partidaId, numero], name: "ronda_unica_por_partida")
 }
 
 model Decision {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  data       Json
+  createdAt  DateTime  @default(now())
 
-  jugadorId String
-  jugador   Jugador @relation(fields: [jugadorId], references: [id])
+  jugadorId  Int
+  jugador    Jugador   @relation(fields: [jugadorId], references: [id])
 
-  partidaId String
-  partida   Partida @relation(fields: [partidaId], references: [id])
+  partidaId  Int
+  partida    Partida   @relation(fields: [partidaId], references: [id])
 
-  rondaId String
-  ronda   Ronda  @relation(fields: [rondaId], references: [id])
-
-  data Json
-
-  @@index([partidaId, rondaId, jugadorId])
+  rondaId    Int
+  ronda      Ronda     @relation(fields: [rondaId], references: [id])
 }
 
 model ResultadoRonda {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  data       Json
+  createdAt  DateTime  @default(now())
 
-  partidaId String
-  partida   Partida @relation(fields: [partidaId], references: [id])
+  partidaId  Int
+  partida    Partida   @relation(fields: [partidaId], references: [id])
 
-  rondaId String
-  ronda   Ronda  @relation(fields: [rondaId], references: [id])
-
-  data Json // ← aquí guardamos el objeto de resultados (agregado)
+  rondaId    Int
+  ronda      Ronda     @relation(fields: [rondaId], references: [id])
 
   @@unique([partidaId, rondaId], name: "resultado_unico_por_ronda")
 }

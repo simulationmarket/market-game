@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "prisma generate"
+    "prestart": "prisma db push --accept-data-loss",
+    "postinstall": "prisma generate",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
