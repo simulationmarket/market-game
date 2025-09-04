@@ -52,7 +52,23 @@
         <button id="cancelReservas">Cancelar</button>
     </div>
 
+    <div id="resultadosOverlay" class="hidden">
+  <div id="resultadosContent"></div>
+</div>
+
+<div id="finalOverlay" class="hidden">
+  <div id="finalContent"></div>
+</div>
+
+
+
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="overlay.css">
+    <script src="overlay.js"></script>
+    <link rel="stylesheet" href="finalOverlay.css">
+    <script src="finalOverlay.js"></script>
     <script src="game.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </body>
 </html>

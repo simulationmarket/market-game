@@ -1,5 +1,32 @@
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
+    Overlay.init({ overlayId: 'resultadosOverlay', contentId: 'resultadosContent' });
+    FinalOverlay.init({ overlayId: 'finalOverlay', contentId: 'finalContent' });
+    socket.on('gameEnded', (payload) => {
+  console.log('🏁 Partida finalizada', payload);
+
+  // Desactiva UI y cierra overlay de KPIs si estuviera abierto
+  if (typeof disableNavigation === 'function') disableNavigation();
+  if (window.Overlay && Overlay.hide) Overlay.hide();
+
+  // Muestra el overlay final (podio 1–4 y botón)
+  FinalOverlay.render(payload);
+
+  // Pide los estados y embebe el carrusel de resultados dentro del overlay final
+  socket.emit('solicitarEstadosJugadores');
+  socket.once('todosLosEstados', (estados) => {
+    // Usa el último índice consolidado
+    const getLastClosedRoundIndex = (arr=[]) => {
+      if (!Array.isArray(arr) || arr.length === 0) return -1;
+      const maxLen = arr.reduce((m,e)=> Math.max(m, Array.isArray(e.roundsHistory)? e.roundsHistory.length : 0), 0);
+      return Math.max(-1, maxLen - 1);
+    };
+    const rIndex = getLastClosedRoundIndex(estados);
+    FinalOverlay.injectResults(estados, rIndex);
+  });
+});
+
+
     const disableNavigation = () => {
     navButtons.forEach(button => button.classList.add('disabled'));
 
@@ -47,7 +74,8 @@ let canalesDistribucion = {
     online: 0,
     tiendaPropia: 0,
 };
-
+    let lastRoundOverlayShown = -1;       // última ronda para la que ya mostramos overlay (histórico)
+    let showOverlayPendingForRound = -1;  // ronda cuyos resultados estamos esperando para mostrar
     // Elementos del DOM
     const confirmationDialog = document.getElementById('confirmationDialog');
     const waitingForOthersScreen = document.getElementById('waitingForOthersScreen');
@@ -85,17 +113,31 @@ let canalesDistribucion = {
     });
 
     socket.on('iniciarSiguienteRonda', ({ round: nuevaRonda }) => {
-    console.log("✅ Evento 'iniciarSiguienteRonda' recibido con round:", nuevaRonda);
+  console.log("✅ Evento 'iniciarSiguienteRonda' recibido con round:", nuevaRonda);
 
-    round = nuevaRonda;
-    rondaElement.innerText = `Ronda: ${round}`;
+  round = nuevaRonda;
+  rondaElement.innerText = `Ronda: ${round}`;
 
-    console.log("➡️ Actualizado rondaElement:", rondaElement.innerText);
+  waitingForOthersScreen.classList.add('hidden');
+  calculatingResultsScreen.classList.add('hidden');
+  enableNavigation();
 
-    waitingForOthersScreen.classList.add('hidden');
-    calculatingResultsScreen.classList.add('hidden');
-    enableNavigation();
+  // Resultados de la ronda que acaba de terminar
+  const resultsRoundToShow = (nuevaRonda - 1);
+
+  // 👉 Ahora permitimos 0
+  if (resultsRoundToShow >= 0 && resultsRoundToShow > lastRoundOverlayShown && playerName) {
+    showOverlayPendingForRound = resultsRoundToShow;
+
+    // Podemos pedir el paquete de estados; si aún no estuviera listo,
+    // el handler de "actualizarCuentaResultados" lo volverá a intentar.
+    socket.emit('solicitarEstadosJugadores');
+  }
+
+
+
 });
+
 
 
 
@@ -222,6 +264,119 @@ document.getElementById('confirmSubmit').addEventListener('click', () => {
         console.log(`Sincronizando datos con el servidor:`, playerData);
         socket.emit("updatePlayerData", { playerName, playerData });
     };
-    
+
+    const resultadosOverlay = document.getElementById("resultadosOverlay");
+const resultadosContent = document.getElementById("resultadosContent");
+const closeResultados = document.getElementById("closeResultados");
+
+if (closeResultados) {
+  closeResultados.addEventListener("click", () => {
+    resultadosOverlay.classList.add("hidden");
+  });
+}
+
+// Pintar los 4 KPIs en el overlay
+function renderResultadosSimple(data) {
+  if (!resultadosOverlay || !resultadosContent) return;
+  const fmt = (n) => (Number(n)||0).toLocaleString('es-ES', { style:'currency', currency:'EUR' });
+
+  resultadosContent.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+      <div style="background:#0f0f18;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px;">
+        <div style="opacity:.8;font-size:12px;">Facturación Neta</div>
+        <div style="font-size:20px;font-weight:800;">${fmt(data.facturacionNeta)}</div>
+      </div>
+      <div style="background:#0f0f18;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px;">
+        <div style="opacity:.8;font-size:12px;">Margen Bruto</div>
+        <div style="font-size:20px;font-weight:800;">${fmt(data.margenBruto)}</div>
+      </div>
+      <div style="background:#0f0f18;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px;">
+        <div style="opacity:.8;font-size:12px;">BAII</div>
+        <div style="font-size:20px;font-weight:800;">${fmt(data.baii)}</div>
+      </div>
+      <div style="background:#0f0f18;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px;">
+        <div style="opacity:.8;font-size:12px;">Resultado Neto</div>
+        <div style="font-size:20px;font-weight:800;">${fmt(data.resultadoNeto)}</div>
+      </div>
+    </div>
+  `;
+  resultadosOverlay.classList.remove("hidden");
+}
+
+socket.on("actualizarCuentaResultados", (roundsHistory = [], payload = {}) => {
+  console.log("📩 actualizarCuentaResultados",
+    { roundsHistory, payload, showOverlayPendingForRound, lastRoundOverlayShown }
+  );
+  // nº de rondas cerradas = longitud del histórico
+  const closedRounds = Array.isArray(roundsHistory) ? roundsHistory.length : 0;
+
+  // Debe mostrarse si:
+  // - tenemos una ronda pendiente (>= 0)
+  // - el histórico ya alcanzó esa ronda (closedRounds >= showOverlayPendingForRound + 1)
+  // - y aún no la hemos mostrado
+  const shouldShow =
+    showOverlayPendingForRound >= 0 &&
+    closedRounds >= (showOverlayPendingForRound + 1) &&
+    showOverlayPendingForRound > lastRoundOverlayShown;
+
+  if (shouldShow) {
+    // Pedimos los estados de todos y pintamos todos al recibirlos
+    socket.emit('solicitarEstadosJugadores');
+  } else {
+    console.log("⏭️ Respuesta ignorada (no toca aún):", {
+      closedRounds,
+      showOverlayPendingForRound,
+      lastRoundOverlayShown
+    });
+  }
+});
+
+
+function getLastClosedRoundIndex(estados = []) {
+  if (!Array.isArray(estados) || estados.length === 0) return -1;
+  const maxLen = estados.reduce((m, e) => {
+    const len = Array.isArray(e.roundsHistory) ? e.roundsHistory.length : 0;
+    return Math.max(m, len);
+  }, 0);
+  return Math.max(-1, maxLen - 1); // -1 si aún no hay ninguna ronda cerrada
+}
+// === Pintar KPIs de TODOS los jugadores para la ronda pendiente ===
+// Helper (déjalo cerca del listener)
+function getLastClosedRoundIndex(estados = []) {
+  if (!Array.isArray(estados) || estados.length === 0) return -1;
+  const maxLen = estados.reduce((m, e) => Math.max(m, Array.isArray(e.roundsHistory) ? e.roundsHistory.length : 0), 0);
+  return Math.max(-1, maxLen - 1);
+}
+
+socket.on('todosLosEstados', (estados = []) => {
+  console.log("📩 todosLosEstados", {len: estados.length, showOverlayPendingForRound, lastRoundOverlayShown});
+
+  // Índice realmente consolidado (lo que EXISTE en datos)
+  const closedIndex = getLastClosedRoundIndex(estados);   // p.ej. 0 al empezar la ronda 1
+  if (closedIndex < 0) {
+    console.log("⏳ Aún no hay ninguna ronda cerrada consolidada.");
+    return;
+  }
+
+  // Nunca pintes por delante de lo consolidado:
+  const rIndex = Math.min(
+    (typeof showOverlayPendingForRound === 'number' ? showOverlayPendingForRound : closedIndex),
+    closedIndex
+  );
+
+  // Si ya la mostramos, salimos
+  if (rIndex <= lastRoundOverlayShown) return;
+
+  // Asegura que VAMOS a pintar a TODOS (no solo a mí)
+  if (!Array.isArray(estados) || estados.length === 0) return;
+
+  Overlay.renderResultados(estados, rIndex); // 👈 PASA EL ARRAY COMPLETO + el índice correcto
+  lastRoundOverlayShown = rIndex;
+  showOverlayPendingForRound = -1;
+});
+
+
+
+
        
 }); // Fin del bloque document.addEventListener

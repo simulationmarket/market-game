@@ -1,0 +1,97 @@
+/* Backdrop + caja */
+#finalOverlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000;
+}
+#finalOverlay.hidden { display: none; }
+
+#finalContent {
+  position: relative;
+  background: #0f1115; color: #e8e8e8;
+  width: 80vw; height: 80vh;
+  border-radius: 18px; padding: 24px;
+  border: 1px solid #222831;
+  box-shadow: 0 14px 40px rgba(0,0,0,.38);
+  display: grid; grid-template-rows: auto auto 1fr auto; gap: 16px;
+  overflow: hidden;
+}
+
+/* Header */
+.final-title {
+  font-size: 1.6rem; font-weight: 800; letter-spacing: .2px;
+}
+
+/* ===== Podio 1–4 (tarjetones) ===== */
+.podium4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1200px) {
+  .podium4 { grid-template-columns: repeat(2, 1fr); }
+}
+.pod-card {
+  background:#151922;
+  border:2px solid transparent;
+  border-radius:16px; padding:16px;
+  display:flex; flex-direction:column; gap:8px;
+  align-items:flex-start; justify-content:space-between;
+  min-height: 120px;
+}
+.pod-head { display:flex; align-items:center; gap:10px; }
+.pod-rank {
+  font-weight:900; font-size:0.9rem; padding:4px 8px; border-radius:999px;
+  background:#2a2f3a; color:#cfd7e6;
+}
+.pod-name { font-weight:800; font-size:1.05rem; }
+.pod-metric { font-variant-numeric: tabular-nums; font-weight: 800; font-size:1.05rem; }
+.pod-delta { font-weight:700; }
+.pod-delta.up { color:#36c26b; } .pod-delta.down { color:#ff6b6b; } .pod-delta.flat { color:#9aa4b2; }
+
+/* Marcos por posición */
+.pod-1 { border-color:#FFC857; box-shadow: 0 0 24px rgba(255,200,87,.35); }
+.pod-2 { border-color:#C0C7D1; }
+.pod-3 { border-color:#C08A5B; }
+/* 4º sin marco especial (deja el transparente) */
+
+.trophy {
+  width: 36px; height: 36px; border-radius: 999px;
+  background: radial-gradient(circle, #ffe29a, #ffc857);
+  display:flex; align-items:center; justify-content:center;
+  color:#5c4500; font-weight:900;
+}
+
+/* ===== Bloque de resultados (carrusel embebido) ===== */
+.results-block {
+  background:#0d1016; border:1px solid #222831; border-radius:14px;
+  padding:12px; overflow:auto; /* scroll vertical si crece */
+}
+.subsection-title { font-weight:800; margin: 2px 0 10px; opacity:.95; }
+
+/* Ajustes mínimos para que herede estilos del carrusel existente (overlay.css) */
+.results-block .carousel { position: relative; margin: 0; height: auto; display: grid; grid-template-rows: auto 1fr auto; }
+.results-block .viewport { overflow: hidden; width: 100%; }
+.results-block .slides { display: flex; transition: transform .35s ease; will-change: transform; }
+.results-block .slide { min-width: 100%; box-sizing: border-box; display: grid; grid-template-rows: auto 1fr; }
+.results-block .slide-title { font-weight:800; margin-bottom:10px; opacity:.95; }
+
+/* Cards 2×2 y gráficos: usamos las clases existentes de overlay.css */
+.grid-cards { height: 100%; }
+.chart { flex:1 1 auto; min-height: 120px; margin-top: 8px; display:block; }
+.chart .axis { opacity:.5; }
+.chart .bar { rx:6; ry:6; }
+.chart .bar.up { fill:#36c26b; }
+.chart .bar.down { fill:#ff6b6b; }
+.chart .bar.flat { fill:#9aa4b2; }
+
+/* CTA */
+.final-actions {
+  display:flex; justify-content:flex-end; gap:10px;
+}
+.btn {
+  background:#202532; border:1px solid #2a2f3a; color:#e8e8e8;
+  border-radius:12px; padding:10px 14px; cursor:pointer; font-weight:700;
+}
+.btn:hover { background:#262c3b; }

@@ -1,470 +1,401 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const socket = io();
+  const socket = io();
 
-    // Registrar el plugin para etiquetas
-    Chart.register(ChartDataLabels);
+  // Plugin Chart.js (como en tu versión original)
+  Chart.register(ChartDataLabels);
 
-    // Definir colores para los segmentos
-    const colors = {
-        profesionales: 'rgba(54, 162, 235, 1)', // Azul
-        altosIngresos: 'rgba(255, 206, 86, 1)', // Amarillo
-        granConsumidor: 'rgba(75, 192, 192, 1)', // Verde
-        bajosIngresos: 'rgba(255, 99, 132, 1)', // Rojo
-        innovadores: 'rgba(153, 102, 255, 1)' // Púrpura
-    };
+  // Colores por segmento
+  const colors = {
+    profesionales: 'rgba(54, 162, 235, 1)', // Azul
+    altosIngresos: 'rgba(255, 206, 86, 1)', // Amarillo
+    granConsumidor: 'rgba(75, 192, 192, 1)', // Verde
+    bajosIngresos: 'rgba(255, 99, 132, 1)', // Rojo
+    innovadores: 'rgba(153, 102, 255, 1)'  // Púrpura
+  };
+  let posicionamientoChartInstance = null;
+  const posicionamientoData = [];
+  const productosData = [];
+  let preciosChartInstance = null; // instancia del chart de precios por jugador
+  
 
-    const posicionamientoData = [];
-    const productosData = [];
 
-    // Solicitar los datos del mercado
-    socket.emit('getMarketData');
-    socket.on("marketUpdate", (data) => {
-        console.log("Datos de mercado recibidos:", data);
+  // 👉 Opción B: solo procesamos el PRÓXIMO 'todosLosEstados' tras cada 'marketUpdate'
+  let esperandoEstados = false;
 
-        const segmentos = data.segmentos;
+  // --- MERCADO (segmentos) ---
+  socket.emit('getMarketData'); // como en tu archivo inicial
 
-        for (const segmento in segmentos) {
-            if (segmentos.hasOwnProperty(segmento)) {
-                const datosSegmento = segmentos[segmento];
+  socket.on('marketUpdate', (data) => {
+    console.log('Datos de mercado recibidos:', data);
 
-                // Extraer la función de sensibilidad
-                const funcionTexto = datosSegmento.funcionSensibilidad.replace("function anonymous", "function");
+    const segmentos = data.segmentos || {};
+    posicionamientoData.length = 0; // reset
 
-                // Extraer los coeficientes de la función cuadrática
-                const coeficientes = funcionTexto.match(/-?\d+(\.\d+)?/g); // Captura números con decimales y signos
-                if (coeficientes && coeficientes.length >= 3) {
-                    const a = parseFloat(coeficientes[0]); // Coeficiente de x^2
-                    const b = parseFloat(coeficientes[1]); // Coeficiente de x
-                    const c = parseFloat(coeficientes[2]); // Término independiente
+    for (const segmento in segmentos) {
+      if (!segmentos.hasOwnProperty(segmento)) continue;
+      const datosSegmento = segmentos[segmento];
 
-                    // Calcular el valor máximo (Precio)
-                    const xMax = -c / (2 * a);
+      // === MISMO PARSEO QUE TENÍAS ANTES ===
+      const funcionTexto = String(datosSegmento.funcionSensibilidad || '')
+        .replace('function anonymous', 'function');
 
-                    // Calcular la calidad (Y) como el promedio del producto ideal
-                    const valoresProductoIdeal = Object.values(datosSegmento.productoIdeal);
-                    const calidadPromedio = valoresProductoIdeal.reduce((a, b) => a + b, 0) / valoresProductoIdeal.length;
+      const coeficientes = funcionTexto.match(/-?\d+(\.\d+)?/g); // como tu versión
+      if (coeficientes && coeficientes.length >= 3) {
+        const a = parseFloat(coeficientes[0]); // x^2
+        const b = parseFloat(coeficientes[1]); // x
+        const c = parseFloat(coeficientes[2]); // indep.
 
-                    // Añadir el punto al dataset
-                    posicionamientoData.push({
-                        x: xMax * 0.02, // Escalar si es necesario
-                        y: calidadPromedio,
-                        label: segmento,
-                        backgroundColor: colors[segmento], // Asignar color
-                        pointStyle: 'circle' // Segmentos representados como círculos
-                    });
-                } else {
-                    console.error(`Error al extraer coeficientes para el segmento: ${segmento}`);
-                }
-            }
-        }
-    });
+        // ⚠️ Dejamos tu fórmula original (que te “funcionaba” con tu parseo)
+        const xMax = -c / (2 * a);
 
-    // Solicitar los estados de los jugadores
-    socket.emit('solicitarEstadosJugadores');
-    socket.on('todosLosEstados', (estados = []) => {
-  console.log("Estados de jugadores recibidos:", estados);
+        const valoresProductoIdeal = Object.values(datosSegmento.productoIdeal || {});
+        const calidadPromedio = valoresProductoIdeal.length
+          ? valoresProductoIdeal.reduce((ac, v) => ac + (parseFloat(v) || 0), 0) / valoresProductoIdeal.length
+          : 0;
 
-  // Si no hay estados, no hacemos nada
-  if (!Array.isArray(estados) || estados.length === 0) {
-    renderPosicionamientoChart([...posicionamientoData, ...productosData]);
-    renderPrecioPorJugador([]);
-    return;
-  }
+        posicionamientoData.push({
+          x: xMax * 0.02,  // misma escala visual
+          y: calidadPromedio,
+          label: segmento,
+          backgroundColor: colors[segmento],
+          pointStyle: 'circle'
+        });
+      } else {
+        console.error(`Error al extraer coeficientes para el segmento: ${segmento}`);
+      }
+    }
 
-  // Procesar productos de los jugadores para posicionamiento (defensivo)
-  estados.forEach(estado => {
-    const productos = Array.isArray(estado.products) ? estado.products : [];
-    productos.forEach(producto => {
-      // Fallback: si no hay caracteristicasAjustadas aún, usamos caracteristicas; si tampoco, vacío
-      const ajustadas = producto?.caracteristicasAjustadas || producto?.caracteristicas || {};
-      const vals = Object.values(ajustadas).map(v => parseFloat(v) || 0);
-      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    // Pintar SIEMPRE segmentos
+    renderPosicionamientoChart([...posicionamientoData]);
 
-      // Fallback de precio: precioPercibido → pvp → precio → 0
-      const precioBase = [producto?.precioPercibido, producto?.pvp, producto?.precio]
-        .find(v => typeof v === 'number' && isFinite(v)) ?? 0;
-
-      productosData.push({
-        x: precioBase * 0.02,
-        y: avg,
-        label: producto?.nombre || 'Producto',
-        backgroundColor: 'rgba(255, 255, 255, 1)', // blanco
-        pointStyle: 'rectRot'
-      });
-    });
+    // 👉 Opción B: SIEMPRE pedimos estados al llegar cualquier marketUpdate
+    esperandoEstados = true;                   // solo aceptaremos el PRÓXIMO 'todosLosEstados'
+    socket.emit('solicitarEstadosJugadores');  // pedimos snapshot actual de jugadores
   });
 
-  // Renderizar gráficos
-  renderPosicionamientoChart([...posicionamientoData, ...productosData]);
-  renderPrecioPorJugador(estados);
-});
+  // --- ESTADOS (productos de jugadores) ---
+  socket.on('todosLosEstados', (estados = []) => {
+    // Ignora cualquier 'todosLosEstados' que no sea el pedido por el último 'marketUpdate'
+    if (!esperandoEstados) {
+      console.log('[Benchmark] Ignorando estados (no solicitados tras marketUpdate)');
+      return;
+    }
+    esperandoEstados = false; // consumimos esta respuesta
 
+    console.log('Estados de jugadores recibidos:', estados);
+    productosData.length = 0; // limpiar puntos de productos
 
-    function renderPosicionamientoChart(data) {
-        const ctx = document.getElementById('posicionamientoChart').getContext('2d');
-
-        new Chart(ctx, {
-            type: 'scatter',
-            data: {
-                datasets: data.map(d => ({
-                    label: d.label,
-                    data: [{ x: d.x, y: d.y }],
-                    backgroundColor: d.backgroundColor,
-                    borderColor: d.backgroundColor,
-                    pointRadius: 6,
-                    pointStyle: d.pointStyle
-                }))
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: false // Ocultar la leyenda
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => {
-                                const dataset = context.dataset;
-                                const punto = dataset.data[context.dataIndex];
-                                return `${dataset.label}: (Precio: ${punto.x.toFixed(2)}, Calidad: ${punto.y.toFixed(2)})`;
-                            }
-                        }
-                    },
-                    datalabels: {
-                        display: true, // Mostrar etiquetas
-                        anchor: 'end',
-                        align: 'end',
-                        color: 'white',
-                        font: {
-                            weight: 'bold'
-                        },
-                        formatter: (value, context) => context.dataset.label // Mostrar el nombre del segmento o producto
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Precio (X)',
-                            color: 'white',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        min: 0,
-                        max: 20,
-                        ticks: {
-                            stepSize: 1,
-                            color: 'white'
-                        },
-                        grid: {
-                            color: (ctx) => {
-                                return ctx.tick.value === 10 ? 'white' : 'rgba(255, 255, 255, 0.2)';
-                            },
-                            lineWidth: (ctx) => {
-                                return ctx.tick.value === 10 ? 2 : 1;
-                            },
-                            borderColor: 'white'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Calidad (Y)',
-                            color: 'white',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        min: 0,
-                        max: 20,
-                        ticks: {
-                            stepSize: 1,
-                            color: 'white'
-                        },
-                        grid: {
-                            color: (ctx) => {
-                                return ctx.tick.value === 10 ? 'white' : 'rgba(255, 255, 255, 0.2)';
-                            },
-                            lineWidth: (ctx) => {
-                                return ctx.tick.value === 10 ? 2 : 1;
-                            },
-                            borderColor: 'white'
-                        }
-                    }
-                }
-            }
-        });
+    if (!Array.isArray(estados) || estados.length === 0) {
+      renderPosicionamientoChart([...posicionamientoData]); // solo segmentos
+      renderPrecioPorJugador([]);
+      return;
     }
 
-    const renderPrecioPorJugador = (jugadores) => {
-        const container = document.getElementById('precios-container');
-        container.innerHTML = ''; // Limpiar contenido previo
-    
-        // Crear un único canvas dentro de su contenedor
-        const chartContainer = document.createElement('div');
-        chartContainer.classList.add('chart-item');
-        chartContainer.style.width = '100%'; // Ocupar todo el ancho disponible
-        chartContainer.style.maxWidth = 'none'; // Eliminar límites de ancho
-        chartContainer.style.height = '800px'; // Incrementar la altura para hacerlo más grande
-    
-        const canvas = document.createElement('canvas');
-        canvas.id = 'graficoPrecios';
-        canvas.style.width = '100%'; // Asegurar que el canvas ocupe todo el ancho
-        canvas.style.height = '100%'; // Ajustar la altura al contenedor
-        chartContainer.appendChild(canvas);
-        container.appendChild(chartContainer);
-    
-       
-    
-        // Colores predefinidos
-        const predefinedColors = [
-            'rgba(54, 162, 235, 1)', // Azul
-            'rgba(255, 206, 86, 1)', // Amarillo
-            'rgba(75, 192, 192, 1)', // Verde
-            'rgba(255, 99, 132, 1)', // Rojo
-            'rgba(153, 102, 255, 1)', // Púrpura
-            'rgba(255, 159, 64, 1)', // Naranja
-            'rgba(201, 203, 207, 1)' // Gris claro
-        ];
-    const productos = [];
-        // Recolectar todos los productos únicos
-        jugadores.forEach((jugador) => {
-            jugador.products.forEach((producto) => {
-                if (!productos.includes(producto.nombre) && producto.pvp > 0) {
-                    productos.push(producto.nombre); // Agregar productos únicos con PVP mayor a 0
-                }
-            });
+    // Añadir puntos de productos (SOLO si el precio > 0)
+    estados.forEach(estado => {
+      const productos = Array.isArray(estado.products) ? estado.products : [];
+      productos.forEach(producto => {
+        const ajustadas = producto?.caracteristicasAjustadas || producto?.caracteristicas || {};
+        const vals = Object.values(ajustadas).map(v => parseFloat(v) || 0);
+        const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+
+        // Precio válido: primero precioPercibido, luego pvp, luego precio
+        const precioBase = [producto?.precioPercibido, producto?.pvp, producto?.precio]
+          .find(v => typeof v === 'number' && isFinite(v) && v > 0);
+
+        // ⛔ Si no hay precio > 0, NO pintamos el punto (evita pegotear al eje X en ronda 0)
+        if (typeof precioBase !== 'number') return;
+
+        productosData.push({
+          x: precioBase * 0.02,
+          y: avg,
+          label: producto?.nombre || 'Producto',
+          backgroundColor: 'rgba(255, 255, 255, 1)',
+          pointStyle: 'rectRot'
         });
-    
-       // 1. Recolectar todos los productos únicos
-    
-    jugadores.forEach((jugador) => {
-        jugador.products.forEach((producto) => {
-            if (!productos.includes(producto.nombre)) {
-                productos.push(producto.nombre);
+      });
+    });
+
+    // Render con segmentos + productos
+    renderPosicionamientoChart([...posicionamientoData, ...productosData]);
+    renderPrecioPorJugador(estados);
+  });
+
+  function renderPosicionamientoChart(data) {
+  const canvas = document.getElementById('posicionamientoChart');
+  if (!canvas) return;
+
+  // 🔧 Destruye el chart anterior si existe
+  if (posicionamientoChartInstance) {
+    posicionamientoChartInstance.destroy();
+    posicionamientoChartInstance = null;
+  }
+
+  const ctx = canvas.getContext('2d');
+  posicionamientoChartInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: data.map(d => ({
+        label: d.label,
+        data: [{ x: d.x, y: d.y }],
+        backgroundColor: d.backgroundColor,
+        borderColor: d.backgroundColor,
+        pointRadius: 6,
+        pointStyle: d.pointStyle
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const dataset = context.dataset;
+              const punto = dataset.data[context.dataIndex];
+              return `${dataset.label}: (Precio: ${Number(punto.x).toFixed(2)}, Calidad: ${Number(punto.y).toFixed(2)})`;
             }
-        });
-    });
-
-    // 2. Crear datasets por jugador
-    const datasets = jugadores.map((jugador, index) => {
-        const color = predefinedColors[index % predefinedColors.length];
-        const data = productos.map(nombreBuscado => {
-            const producto = jugador.products.find(p => p.nombre === nombreBuscado);
-            return producto?.pvp ?? producto?.precioPercibido ?? producto?.precio ?? null;
-        });
-
-        return {
-            label: jugador.nombre || jugador.playerName || `Jugador ${index + 1}`,
-            data: data,
-            backgroundColor: color,
-            borderColor: color,
-            borderWidth: 1
-        };
-    });
-
-    // 3. Crear gráfico
-    new Chart(canvas.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: productos, // eje X: nombre de producto
-            datasets: datasets  // una barra por jugador por producto
+          }
         },
-        options: {
+        datalabels: {
+          display: true,
+          anchor: 'end',
+          align: 'end',
+          color: 'white',
+          font: { weight: 'bold' },
+          formatter: (_value, ctx) => ctx.dataset.label
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Precio (X)', color: 'white', font: { weight: 'bold' } },
+          min: 0,
+          max: 20,
+          ticks: { stepSize: 1, color: 'white' },
+          grid: {
+            color: (ctx) => ctx.tick.value === 10 ? 'white' : 'rgba(255, 255, 255, 0.2)',
+            lineWidth: (ctx) => ctx.tick.value === 10 ? 2 : 1,
+            borderColor: 'white'
+          }
+        },
+        y: {
+          title: { display: true, text: 'Calidad (Y)', color: 'white', font: { weight: 'bold' } },
+          min: 0,
+          max: 20,
+          ticks: { stepSize: 1, color: 'white' },
+          grid: {
+            color: (ctx) => ctx.tick.value === 10 ? 'white' : 'rgba(255, 255, 255, 0.2)',
+            lineWidth: (ctx) => ctx.tick.value === 10 ? 2 : 1,
+            borderColor: 'white'
+          }
+        }
+      }
+    }
+  });
+}
+const renderPrecioPorJugador = (jugadores = []) => {
+  const container = document.getElementById('precios-container') || document.getElementById('precioPorJugador');
+  if (!container) return;
+
+  // === medir el bloque de Posicionamiento ===
+  // intentamos leer el wrapper del scatter (".chart-item"); si no, el parent del canvas
+  const posCanvas = document.getElementById('posicionamientoChart');
+  const posWrapper = posCanvas ? (posCanvas.closest('.chart-item') || posCanvas.parentElement) : null;
+  const rect = posWrapper ? posWrapper.getBoundingClientRect()
+                          : (posCanvas ? posCanvas.getBoundingClientRect() : { width: 960, height: 480 });
+
+  const targetWidth  = Math.max(Math.round(rect.width  || 960), 600);
+  const targetHeight = Math.max(Math.round(rect.height || 480), 320);
+
+// --- CONTENEDOR: céntralo y evita límites del padre ---
+container.innerHTML = '';
+container.style.display = 'flex';
+container.style.justifyContent = 'center';
+container.style.alignItems = 'stretch';
+container.style.width = '100%';
+container.style.maxWidth = 'none';
+container.style.margin = '0';
+container.style.boxSizing = 'border-box';
+
+// Si el padre es CSS Grid y te mete en una columna estrecha,
+// haz que este bloque ocupe TODAS las columnas:
+container.style.gridColumn = '1 / -1';
+
+// --- WRAPPER "card" negro con tamaño FIJO (no se reduce en flex/grid) ---
+const wrapper = document.createElement('div');
+wrapper.className = 'chart-item';
+wrapper.style.background   = '#000';
+wrapper.style.borderRadius = '16px';
+wrapper.style.padding      = '16px';
+wrapper.style.boxShadow    = '0 4px 16px rgba(0,0,0,0.35)';
+
+// Igualamos EXACTAMENTE al tamaño del bloque de Posicionamiento:
+wrapper.style.width   = `${targetWidth}px`;
+wrapper.style.minWidth= `${targetWidth}px`;
+wrapper.style.maxWidth= `${targetWidth}px`;
+wrapper.style.height  = `${targetHeight}px`;
+
+// Clave para flex: tamaño fijo, NO shrink
+wrapper.style.flex = `0 0 ${targetWidth}px`;
+wrapper.style.alignSelf = 'center';
+wrapper.style.boxSizing = 'border-box';
+
+// Canvas a 100% del wrapper
+const canvas = document.createElement('canvas');
+canvas.style.width = '100%';
+canvas.style.height = '100%';
+wrapper.appendChild(canvas);
+container.appendChild(wrapper);
+
+// Ajusta los atributos reales para nitidez retina
+canvas.width  = wrapper.clientWidth;
+canvas.height = wrapper.clientHeight;
+
+  const predefinedColors = [
+    'rgba(54, 162, 235, 1)',
+    'rgba(255, 206, 86, 1)',
+    'rgba(75, 192, 192, 1)',
+    'rgba(255, 99, 132, 1)',
+    'rgba(153, 102, 255, 1)',
+    'rgba(255, 159, 64, 1)',
+    'rgba(201, 203, 207, 1)'
+  ];
+
+  // productos únicos
+  const productos = [];
+  jugadores.forEach(j => (j.products || []).forEach(p => {
+    if (!productos.includes(p.nombre)) productos.push(p.nombre);
+  }));
+
+  // datasets por jugador
+  const datasets = jugadores.map((jugador, index) => {
+    const color = predefinedColors[index % predefinedColors.length];
+    const data = productos.map(nombreBuscado => {
+      const p = (jugador.products || []).find(pp => pp.nombre === nombreBuscado);
+      const precio =
+        (typeof p?.precioPercibido === 'number' && p.precioPercibido > 0) ? p.precioPercibido :
+        (typeof p?.pvp === 'number' && p.pvp > 0) ? p.pvp :
+        (typeof p?.precio === 'number' && p.precio > 0) ? p.precio :
+        null;
+      return precio;
+    });
+
+    return {
+      label: jugador.nombre || jugador.playerName || `Jugador ${index + 1}`,
+      data,
+      backgroundColor: color,
+      borderColor: color,
+      borderWidth: 1
+    };
+  });
+
+  // destruir instancia previa si existe
+  if (preciosChartInstance) {
+    preciosChartInstance.destroy();
+    preciosChartInstance = null;
+  }
+
+  // crear chart respetando el tamaño del wrapper (mismo que Posicionamiento)
+  preciosChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels: productos, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false, // respeta width/height del contenedor
+      plugins: {
+        legend: { position: 'top', labels: { color: 'white' } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const valor = ctx.raw;
+              if (valor == null) return `${ctx.dataset.label}: —`;
+              return `${ctx.dataset.label}: ${Number(valor).toFixed(2)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.2)' } },
+        y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.2)' } }
+      }
+    }
+  });
+};
+
+
+
+  // Conexión (como en tu archivo)
+  socket.on('connect', () => {
+    console.log('Conectado al servidor. Solicitando resultados...');
+    socket.emit('solicitarResultados');
+  });
+
+  // Resultados finales (sin tocar)
+  socket.on('resultadosFinales', (resultadosFinales) => {
+    console.log('Resultados finales recibidos:', resultadosFinales);
+    const canales = ['granDistribucion', 'minoristas', 'online', 'tiendaPropia'];
+    const cuotasPorCanal = {};
+    canales.forEach(canal => { cuotasPorCanal[canal] = {}; });
+
+    resultadosFinales.forEach(({ jugador, canal, unidadesVendidas }) => {
+      if (!canal || !jugador || isNaN(parseFloat(unidadesVendidas))) return;
+      if (!cuotasPorCanal[canal][jugador]) { cuotasPorCanal[canal][jugador] = 0; }
+      cuotasPorCanal[canal][jugador] += parseFloat(unidadesVendidas);
+    });
+
+    console.log('Cuotas calculadas por canal:', cuotasPorCanal);
+    renderCuotasPorCanal(canales, cuotasPorCanal);
+  });
+
+  function renderCuotasPorCanal(canales, cuotasPorCanal) {
+    const predefinedColors = [
+      'rgba(28, 13, 224, 0.79)', 'rgba(206, 160, 44, 0.73)', 'rgba(60, 223, 223, 0.84)',
+      'rgba(255, 99, 132, 0.6)', 'rgba(124, 64, 243, 0.72)', 'rgba(235, 125, 15, 0.6)',
+      'rgba(35, 118, 212, 0.93)'
+    ];
+
+    canales.forEach((canal, index) => {
+      const canalId = `canal${index + 1}Chart`;
+      const container = document.getElementById(canalId);
+      if (!container) return;
+
+      const total = Object.values(cuotasPorCanal[canal]).reduce((a, b) => a + b, 0);
+      if (total === 0) return;
+
+      const labels = Object.keys(cuotasPorCanal[canal]);
+      const data = labels.map(j => (cuotasPorCanal[canal][j] / total) * 100);
+      const bg = labels.map((_, i) => predefinedColors[i % predefinedColors.length]);
+      const bd = labels.map((_, i) => predefinedColors[i % predefinedColors.length].replace('0.6', '1'));
+
+      try {
+        if (container._chartInstance) {
+  container._chartInstance.destroy();
+  container._chartInstance = null;
+}
+
+container._chartInstance = new Chart(container.getContext('2d'), {
+          type: 'bar',
+          data: { labels, datasets: [{ label: `Cuota de Canal (${canal})`, data, backgroundColor: bg, borderColor: bd, borderWidth: 1 }] },
+          options: {
             responsive: true,
-            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: true,
-                    labels: {
-                        color: 'white'
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: context => {
-                            const value = context.raw;
-                            return value !== null ? `${context.dataset.label}: PVP ${value.toFixed(2)}` : null;
-                        }
-                    }
-                }
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `${ctx.raw.toFixed(2)}%` } },
+              datalabels: {
+                anchor: 'end', align: 'start', color: 'white',
+                formatter: (v) => `${v.toFixed(2)}%`
+              }
             },
             scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Productos',
-                        color: 'white'
-                    },
-                    ticks: {
-                        color: 'white'
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.2)'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'PVP',
-                        color: 'white'
-                    },
-                    ticks: {
-                        color: 'white',
-                        beginAtZero: true
-                    },
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.2)'
-                    }
-                }
+              x: { title: { display: true, text: 'Jugadores', color: 'white', font: { weight: 'bold' } }, ticks: { color: 'white' }, grid: { color: 'rgba(255, 255, 255, 0.2)', borderColor: 'white' } },
+              y: { title: { display: true, text: 'Cuota (%)', color: 'white', font: { weight: 'bold' } }, ticks: { color: 'white', beginAtZero: true }, grid: { color: 'rgba(255, 255, 255, 0.2)', borderColor: 'white' } }
             }
-        }
-    });
-};
-    
-    
-    
-    
-
-    // Solicitar resultados cuando el cliente se conecte
-    socket.on('connect', () => {
-        console.log("Conectado al servidor. Solicitando resultados...");
-        socket.emit('solicitarResultados'); // Solicita los resultados al servidor
-    });
-
-    // Escuchar los resultados finales enviados por el servidor
-    socket.on('resultadosFinales', (resultadosFinales) => {
-        console.log("Resultados finales recibidos:", resultadosFinales);
-        const canales = ['granDistribucion', 'minoristas', 'online', 'tiendaPropia'];
-        const cuotasPorCanal = {};
-    
-        // Inicializar estructura
-        canales.forEach(canal => {
-            cuotasPorCanal[canal] = {};
+          },
+          plugins: [ChartDataLabels]
         });
-    
-        // Calcular cuotas
-        resultadosFinales.forEach(({ jugador, canal, unidadesVendidas }) => {
-    if (!canal || !jugador || isNaN(parseFloat(unidadesVendidas))) return;
-    if (!cuotasPorCanal[canal][jugador]) {
-        cuotasPorCanal[canal][jugador] = 0;
-    }
-    cuotasPorCanal[canal][jugador] += parseFloat(unidadesVendidas);
+      } catch (error) {
+        console.error(`Error al crear el gráfico para ${canal}:`, error);
+      }
+    });
+  }
 });
-
-    
-        console.log("Cuotas calculadas por canal:", cuotasPorCanal);
-    
-        // Crear gráficos
-        renderCuotasPorCanal(canales, cuotasPorCanal);
-    });
-    
-    function renderCuotasPorCanal(canales, cuotasPorCanal) {
-        // Colores predefinidos para los jugadores
-        const predefinedColors = [
-            'rgba(28, 13, 224, 0.79)', // Azul
-            'rgba(206, 160, 44, 0.73)', // Amarillo
-            'rgba(60, 223, 223, 0.84)', // Verde
-            'rgba(255, 99, 132, 0.6)', // Rojo
-            'rgba(124, 64, 243, 0.72)', // Púrpura
-            'rgba(235, 125, 15, 0.6)', // Naranja
-            'rgba(35, 118, 212, 0.93)' // Gris claro
-        ];
-    
-        canales.forEach((canal, index) => {
-            const canalId = `canal${index + 1}Chart`;
-            const container = document.getElementById(canalId);
-    
-            if (!container) {
-                console.error(`No se encontró el elemento <canvas> con ID ${canalId}.`);
-                return;
-            }
-    
-            const totalDemanda = Object.values(cuotasPorCanal[canal]).reduce((a, b) => a + b, 0);
-    
-            if (totalDemanda === 0) {
-                console.warn(`No hay datos para el canal ${canal}.`);
-                return;
-            }
-    
-            const labels = Object.keys(cuotasPorCanal[canal]);
-            const data = labels.map(jugador => (cuotasPorCanal[canal][jugador] / totalDemanda) * 100);
-    
-            // Asignar colores a los jugadores
-            const backgroundColors = labels.map((_, index) => predefinedColors[index % predefinedColors.length]);
-            const borderColors = labels.map((_, index) => predefinedColors[index % predefinedColors.length].replace('0.6', '1')); // Versión sólida del color
-    
-            console.log(`Datos para el gráfico del canal ${canal}:`, { labels, data });
-    
-            try {
-                new Chart(container.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: `Cuota de Canal (${canal})`,
-                            data: data,
-                            backgroundColor: backgroundColors,
-                            borderColor: borderColors,
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: false // Ocultar la leyenda
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: (context) => `${context.raw.toFixed(2)}%` // Mostrar dos decimales en el tooltip
-                                }
-                            },
-                            datalabels: {
-                                anchor: 'end',
-                                align: 'start',
-                                color: 'white',
-                                formatter: (value) => `${value.toFixed(2)}%` // Formato con dos decimales
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Jugadores',
-                                    color: 'white',
-                                    font: { weight: 'bold' }
-                                },
-                                ticks: { color: 'white' },
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.2)',
-                                    borderColor: 'white'
-                                }
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Cuota (%)',
-                                    color: 'white',
-                                    font: { weight: 'bold' }
-                                },
-                                ticks: { color: 'white', beginAtZero: true },
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.2)',
-                                    borderColor: 'white'
-                                }
-                            }
-                        }
-                    },
-                    plugins: [ChartDataLabels] // Activar el plugin de datalabels
-                });
-            } catch (error) {
-                console.error(`Error al crear el gráfico para ${canal}:`, error);
-            }
-        });
-    }
-    
-    
-    
-});    

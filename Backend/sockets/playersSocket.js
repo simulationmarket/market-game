@@ -1,10 +1,39 @@
 const players = {};  // Objeto para almacenar los jugadores y su estado
+let gamePhase = 'lobby'; // 'lobby' | 'playing' | 'ended'
+
+function humanosConectados() {
+  return Object.keys(socketsToPlayers)
+    .map(id => socketsToPlayers[id])
+    .filter(name => players[name] && !players[name].esBot).length;
+}
+
+function resetLobby(io) {
+  console.log('🔁 Reset lobby → vaciando estado');
+  // Limpia jugadores y mapas
+  for (const id of Object.keys(socketsToPlayers)) delete socketsToPlayers[id];
+  for (const name of Object.keys(players)) delete players[name];
+
+  // Limpia caches/timers de tu módulo
+  resultadosCache = null;
+  estadosCache = null;
+  resultadosCompletosCache = null;
+
+  // Reabre inscripción
+  inscripcionCerrada = false;
+  inscripcionTemporizador = null;
+
+  gamePhase = 'lobby';
+  io?.emit?.('lobbyReset');
+}
+
 const socketsToPlayers = {};  // Mapeo para rastrear qué socket pertenece a qué jugador
 let totalPlayersConnected = 0;  // Llevar un conteo de los jugadores conectados
 const { marketData, actualizarMercado } = require('./market.js');  // Asegúrate de tener esta referencia correctamente
 const { iniciarCalculos, eventEmitter } = require('../utils/calculos');
 const { tomarDecisionesBot } = require('../utils/bots');
 const TIEMPO_ESPERA_INSCRIPCION = 5000; // o el tiempo que quieras
+const MAX_ROUNDS = 10;
+
 let inscripcionTemporizador = null;
 let inscripcionCerrada = false;
 // Definir funciones antes de utilizarlas
@@ -129,7 +158,9 @@ function cerrarInscripcionAutomatica(io, MAX_PLAYERS, players) {
 
   // Marcar todos como listos (para startGame)
   Object.values(players).forEach(p => p.ready = true);
-  io.emit('startGame');
+  inscripcionCerrada = true;
+  gamePhase = 'playing';
+  io.emit('startGame')
 }
 
 
@@ -161,11 +192,13 @@ module.exports = (io, players, MAX_PLAYERS) => {
 
     // Escuchar el evento "resultadosCompletosGenerados"
     eventEmitter.on('resultadosCompletosGenerados', (resultados) => {
-        
+      resultadosCompletosCache = resultados;
 
-        // Guardar en la caché de resultados completos
-        resultadosCompletosCache = resultados;
-        
+      // Refrescar estadosCache AHORA que roundsHistory ya está escrito
+      estadosCache = Object.entries(players).map(([playerName, p]) => ({
+        playerName,
+        ...p.gameState,
+      }));
     });
 
     // Manejar eventos de conexión del cliente
@@ -186,18 +219,31 @@ module.exports = (io, players, MAX_PLAYERS) => {
             }
         });
 
-        // Manejar la solicitud de estados de todos los jugadores
-        socket.on('solicitarEstadosJugadores', () => {
-            console.log("Cliente solicitó estados de todos los jugadores:", socket.id);
-            if (estadosCache) {
-                console.log("Enviando estados de jugadores al cliente.");
-                socket.emit('todosLosEstados', estadosCache); // Emitir estados almacenados en caché
-            } else {
-                console.log("No hay estados de jugadores disponibles.");
-                socket.emit('todosLosEstados', []); // Enviar lista vacía si no hay datos
-            }
-        });
+        socket.on('leaveRoom', () => {
+        const name = socketsToPlayers[socket.id];
+        if (!name) return;
+        console.log(`🚪 ${name} sale al índice`);
+        delete socketsToPlayers[socket.id];
+        delete players[name];
 
+        if (gamePhase === 'ended' && humanosConectados() === 0) {
+          resetLobby(io);
+        }
+      });
+
+
+        // Manejar la solicitud de estados de todos los jugadores  ✅ FRESCO (sin caché)
+        socket.on('solicitarEstadosJugadores', () => {
+          console.log("Cliente solicitó estados de todos los jugadores:", socket.id);
+          const estados = Object.entries(players).map(([playerName, p]) => ({
+            playerName,
+            ...p.gameState,            // 👈 incluye roundsHistory ya persistido
+          }));
+          console.log("Enviando estados de jugadores al cliente. rh_len:",
+            estados.map(e => ({ player: e.playerName, rh_len: Array.isArray(e.roundsHistory) ? e.roundsHistory.length : 0 }))
+          );
+          socket.emit('todosLosEstados', estados);
+        });
         // Manejar solicitud de resultados completos
         socket.on('solicitarResultadosCompletos', () => {
             console.log("Cliente solicitó resultados completos:", socket.id);
@@ -215,6 +261,12 @@ module.exports = (io, players, MAX_PLAYERS) => {
 
         // Evento para registrar o reconectar un jugador
         socket.on('identificarJugador', (playerName) => {
+
+          if (gamePhase === 'ended') {
+          console.log('♻️ Nuevo jugador tras partida terminada → reset lobby');
+          resetLobby(io);
+        }
+
             if (socketsToPlayers[socket.id]) {
                 console.log(`El jugador ya está identificado con este socket.`);
                 return;
@@ -427,16 +479,96 @@ module.exports = (io, players, MAX_PLAYERS) => {
       });
 
       // nº de ronda = la que empieza ahora (max round de players + 1)
-        const rondas = Object.values(players).map(p => p.gameState?.round || 0);
-        const rondaNumero = Math.max(...rondas) + 1;
+const rondas = Object.values(players).map(p => p.gameState?.round || 0);
+const rondaNumero = Math.max(...rondas) + 1;
 
-        // persistir agregado de resultados
-        io.gameService.guardarResultadosRonda({
-        rondaNumero,
-        data: resultadosFinales
-        }).catch(() => {});
+// Persistimos el agregado de resultados de la ronda que acaba de cerrar (como hacías)
+io.gameService.guardarResultadosRonda({
+  rondaNumero,
+  data: resultadosFinales
+}).catch(() => {});
 
-      iniciarSiguienteRonda(io, players, resultadosFinales, socketsToPlayers);
+// 👇 CORTE DE FIN DE PARTIDA
+if (rondaNumero > MAX_ROUNDS) {
+  // Construir leaderboard con datos de la ÚLTIMA ronda cerrada
+  const rows = Object.entries(players).map(([name, p]) => {
+    const rh = Array.isArray(p?.gameState?.roundsHistory) ? p.gameState.roundsHistory : [];
+    const last = rh[rh.length - 1] || {};
+    const prev = rh.length > 1 ? rh[rh.length - 2] : null;
+
+    const valorAccion = Number(last.valorAccion) || 0;
+    const resultadoNeto = Number(last.resultadoNeto) || 0;
+    const bai = Number(last.bai) || 0;       // desempate 2
+    const baii = Number(last.baii) || 0;     // por si quieres mostrar en tabla
+    const facturacionNeta = Number(last.facturacionNeta) || 0;
+
+    const prevPrecio = prev ? Number(prev.valorAccion) || 0 : null;
+    const deltaAbs = prevPrecio === null ? null : (valorAccion - prevPrecio);
+    const deltaPct = (prevPrecio && prevPrecio !== 0)
+      ? ( (valorAccion - prevPrecio) / Math.abs(prevPrecio) ) * 100
+      : null;
+
+    const displayName = p.nombreEmpresa || p.nombre || name;
+
+    return {
+      playerId: name,
+      name: displayName,
+      valorAccion,
+      resultadoNeto,
+      bai,
+      baii,
+      facturacionNeta,
+      deltaAbs,
+      deltaPct
+    };
+  });
+
+  // Orden: 1) Precio acción DESC, 2) Resultado Neto DESC, 3) BAI DESC
+  rows.sort((a, b) =>
+    (b.valorAccion - a.valorAccion) ||
+    (b.resultadoNeto - a.resultadoNeto) ||
+    (b.bai - a.bai)
+  );
+
+  // Ganador(es) por precio de la acción (co-ganadores si empatan en precio)
+  const topValor = rows.length ? rows[0].valorAccion : null;
+  const winners = rows.filter(r => r.valorAccion === topValor);
+
+  const payload = {
+    roomId: null, // si manejas salas pon aquí su id
+    roundIndex: MAX_ROUNDS,
+    winners: winners.map(w => ({
+      playerId: w.playerId,
+      name: w.name,
+      valorAccion: w.valorAccion,
+      deltaAbs: w.deltaAbs,
+      deltaPct: w.deltaPct
+    })),
+    leaderboard: rows.map(r => ({
+      playerId: r.playerId,
+      name: r.name,
+      valorAccion: r.valorAccion,
+      deltaPct: r.deltaPct,
+      resultadoNeto: r.resultadoNeto,
+      baii: r.baii,
+      facturacionNeta: r.facturacionNeta
+    })),
+    tiebreaker: "resultadoNeto>BAI",
+    endedAt: new Date().toISOString()
+  };
+
+  io.emit('gameEnded', payload);
+  gamePhase = 'ended';
+// limpia a los X segundos o al primer jugador nuevo
+  setTimeout(() => resetLobby(io), 15000);
+  
+  // ¡OJO! No llames a iniciarSiguienteRonda: la partida termina aquí.
+  return;
+}
+
+// Si NO ha terminado, continúas como antes
+iniciarSiguienteRonda(io, players, resultadosFinales, socketsToPlayers);
+
     }); // <-- cierra once('calculosRealizados', ...)
 
     // Lanza cálculos
@@ -529,7 +661,7 @@ module.exports = (io, players, MAX_PLAYERS) => {
                         console.log(`Eliminando datos del jugador ${playerName} debido a desconexión prolongada.`);
                         delete players[playerName];
                     }
-                }, 1000000000);
+                }, 3000);
             }
         });
 

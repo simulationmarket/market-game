@@ -220,3 +220,25 @@ canvas {
     filter: grayscale(0.5);
 }
 
+/* Overlay de Resultados */
+#resultadosOverlay {
+  position: fixed;
+  inset: 10%;
+  background: #0a0a0f;
+  border: 2px solid cyan;
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 3000;
+  overflow: auto;
+  color: #fff;
+}
+#resultadosOverlay.hidden { display: none; }
+
+#closeResultados {
+  background: red;
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
