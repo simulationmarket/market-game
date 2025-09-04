@@ -1,5 +1,0 @@
-backend/.env
-node_modules/
-.dockerignore
-backend/prisma/dev.db
-backend/prisma/dev.db-journal

@@ -1,0 +1,20 @@
+# ===== Node =====
+node_modules
+Backend/node_modules
+Frontend/node_modules
+
+# ===== Prisma DB local =====
+Backend/prisma/dev.db
+
+# ===== Build output del frontend =====
+Frontend/dist
+
+# ===== Logs y temporales =====
+npm-debug.log
+yarn-error.log
+.DS_Store
+Thumbs.db
+
+# ===== Git =====
+.git
+.gitignore
