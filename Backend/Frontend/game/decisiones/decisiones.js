@@ -208,29 +208,28 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Ronda actual:", data.round);
 
     // Primera interacción de esta ronda → aplica deducciones iniciales
-    if (data.interactuadoEnRonda === null) {
-      console.log("Primera interacción de esta ronda. Calculando gastos iniciales...");
+    const lastInteracted = Number(data.interactuadoEnRonda ?? -1);
+if (lastInteracted !== Number(data.round)) {
+  console.log("Primera interacción de esta ronda. Calculando gastos iniciales...");
 
-      productos.forEach(producto => {
-        const gastoFabricacion = (producto.unidadesFabricar || 0) * (producto.costeUnitarioEst || 0);
-        const gastoPublicidad  = (producto.publicidad || 0);
-        presupuestoActual -= (gastoFabricacion + gastoPublicidad);
-        console.log(`Producto: ${producto.nombre}, Fabricación: ${gastoFabricacion}, Publicidad: ${gastoPublicidad}`);
-      });
+  productos.forEach(producto => {
+    const gastoFabricacion = (producto.unidadesFabricar || 0) * (producto.costeUnitarioEst || 0);
+    const gastoPublicidad  = (producto.publicidad || 0);
+    presupuestoActual -= (gastoFabricacion + gastoPublicidad);
+  });
 
-      const gastoCanales = calcularPresupuestoCanalesTotal();
-      presupuestoActual -= gastoCanales;
-      console.log(`Gasto en canales aplicado: ${gastoCanales}`);
+  const gastoCanales = calcularPresupuestoCanalesTotal();
+  presupuestoActual -= gastoCanales;
 
-      // En lugar de 'actualizarRondaInteractuada' (no existe en el server), usa updatePlayerData
-      socket.emit("updatePlayerData", {
-        playerName,
-        playerData: { rondaInteractuada: data.round }
-      });
-      console.log(`Marcada ronda ${data.round} como interactuada (server).`);
-    } else {
-      console.log("Esta ronda ya fue procesada. No se realizan deducciones adicionales.");
-    }
+  // Persistir que YA interactuamos esta ronda (usa el mismo campo que lees)
+  socket.emit("updatePlayerData", {
+    playerName,
+    playerData: { interactuadoEnRonda: data.round }
+  });
+  console.log(`Marcada ronda ${data.round} como interactuada (server).`);
+} else {
+  console.log("Esta ronda ya fue procesada. No se realizan deducciones adicionales.");
+}
 
     // Sincroniza inputs de canales
     document.getElementById("gran-distribucion").value = canalesDistribucion.granDistribucion || 0;
@@ -251,17 +250,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====== Guardar decisiones y volver a game.html (preservando partidaId) ======
   document.getElementById("guardar-decisiones").addEventListener("click", () => {
     const datosEnvio = {
-      playerName,
-      playerData: {
-        budget: presupuestoActual,
-        reserves,
-        products: productos,
-        canalesDistribucion,
-        projects,
-        loans,
-        rondaInteractuada: true // marca que ya interactuó
-      }
-    };
+  playerName,
+  playerData: {
+    budget: presupuestoActual,
+    reserves,
+    products: productos,
+    canalesDistribucion,
+    projects,
+    loans
+    // nada de interactuadoEnRonda aquí: solo se marca en la PRIMERA carga
+  }
+};
     socket.emit("updatePlayerData", datosEnvio);
 
     const url = new URL("../game.html", location.href);
