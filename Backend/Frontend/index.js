@@ -4,13 +4,16 @@
 // const socket = io("https://tuapp.koyeb.app", {
 const socket = io('/', {
   path: '/socket.io',
-  transports: ['websocket', 'polling'], // ✅ no fuerces solo websocket
+  transports: ['polling'],
+  upgrade: false,              // <- no intenta WebSocket
   withCredentials: true,
-  upgrade: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000
 });
+
+socket.on('connect', () => console.log('[OK] conectado por polling'));
+socket.on('connect_error', (e) => console.log('[connect_error]', e?.message, e));
 // --- Elementos de la UI ---
 const playerNameInput = document.getElementById("playerName");
 const partidaIdInput   = document.getElementById("partidaId");
