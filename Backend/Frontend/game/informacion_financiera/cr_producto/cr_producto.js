@@ -1,19 +1,25 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Este iframe recibe datos por postMessage desde informacion_financiera.js
+  // Estado local de este iframe
   let playerName = null;
+  let playerKeyNorm = null; // clave normalizada que infiere el parent
   let roundsHistory = [];
   let resultados = [];
 
   function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
-function _matchJugador(row, playerName){
-  const c = _norm(row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre);
-  const p = _norm(playerName);
-  if (!c || !p) return false;
-  // exacto o “contiene” en ambos sentidos (útil si en resultados sale "PERLITA S.A." y tu nombre es "PERLITA")
-  return c === p || c.includes(p) || p.includes(c);
-}
+  function _matchRowByPlayer(row, playerName, playerKeyNorm){
+    const c = _norm(row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre);
+    if (playerKeyNorm) {
+      return c === playerKeyNorm || c.includes(playerKeyNorm) || playerKeyNorm.includes(c);
+    }
+    const p = _norm(playerName);
+    return c === p || c.includes(p) || p.includes(c);
+  }
+  function _myProductSet(roundData){
+    const prods = (roundData?.decisiones?.products || []).map(p => p?.nombre).filter(Boolean);
+    return new Set(prods.map(_norm));
+  }
 
-  // Telemetría (opcional)
+  // Telemetría mínima
   window.addEventListener('message', (e) => {
     const d = e.data || {};
     if (d.type === 'RESULTADOS_COMPLETOS' || d.type === 'SYNC') {
@@ -25,38 +31,45 @@ function _matchJugador(row, playerName){
     }
   });
 
-  // Render gate
   function tryRender() {
     if (!playerName || !Array.isArray(roundsHistory) || roundsHistory.length === 0 || !Array.isArray(resultados) || resultados.length === 0) {
       return;
     }
 
-    // Última ronda consolidada
     const lastIndex = roundsHistory.length - 1;
     const roundData = roundsHistory[lastIndex];
 
-    // Conteo rápido para ver si el filtro está dejando todo a 0
-const resultadosJugador = resultados.filter(r => _matchJugador(r, playerName));
-console.log("[CR-PROD] filas totales:", resultados.length, "mías:", resultadosJugador.length, "player:", playerName);
+    // 1) Intento por nombre
+    let resultadosJugador = resultados.filter(r => _matchRowByPlayer(r, playerName, playerKeyNorm));
+    console.log("[CR-PROD] totales:", resultados.length, "mías (nombre):", resultadosJugador.length, "key:", playerKeyNorm || playerName);
 
-// Si sigue 0, imprime algunos candidatos de nombres que llegan
-if (resultadosJugador.length === 0) {
-  const candidatos = [...new Set(resultados.slice(0, 50).map(r => (r.jugador ?? r.empresa ?? "")))];
-  console.warn("[CR-PROD] ejemplos de 'jugador/empresa' en resultados:", candidatos.slice(0, 10));
-}
-
-
+    // 2) Fallback por producto si no hay match por nombre
+    if (resultadosJugador.length === 0) {
+      const mySet = _myProductSet(roundData);
+      resultadosJugador = resultados.filter(r => mySet.has(_norm(r.producto)));
+      console.warn("[CR-PROD] usando fallback por producto → filas:", resultadosJugador.length, "prods:", [...mySet]);
+      if (resultadosJugador.length === 0) {
+        const ejemplos = [...new Set(resultados.slice(0, 20).map(r => r.jugador ?? r.empresa ?? "(sin nombre)"))];
+        console.warn("[CR-PROD] ejemplos de 'jugador/empresa' en resultados:", ejemplos);
+        const cont = document.getElementById("tabla-contenedor");
+        if (cont) cont.innerHTML = "<p>Sin filas para tu jugador/productos todavía.</p>";
+        const canvas = document.getElementById("gastosProductoChart");
+        if (canvas?.getContext) canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
+        return;
+      }
+    }
 
     const productosConsolidados = consolidarResultadosPorProducto(resultadosJugador, roundData);
     generarEstructuraTabla(productosConsolidados);
     generarGraficoPorProducto(productosConsolidados);
   }
 
-  // Compat: soporta mensajes con type o “legacy” sin type
+  // Listener de mensajes del parent
   window.addEventListener('message', (event) => {
     const data = event.data || {};
     const { type } = data;
 
+    // Compatibilidad legacy (sin 'type')
     if (!type) {
       const { playerName: pn, resultados: res, roundsHistory: rh } = data;
       if (pn) playerName = pn;
@@ -75,8 +88,9 @@ if (resultadosJugador.length === 0) {
     }
 
     if (type === 'RESULTADOS_COMPLETOS') {
-      const { playerName: pn, roundsHistory: rh, resultados: res } = data;
+      const { playerName: pn, playerKeyNorm: pkn, roundsHistory: rh, resultados: res } = data;
       if (pn) playerName = pn;
+      if (pkn) playerKeyNorm = pkn;
       if (Array.isArray(rh)) roundsHistory = rh;
       if (Array.isArray(res)) resultados = res;
       tryRender();
@@ -85,7 +99,7 @@ if (resultadosJugador.length === 0) {
   });
 });
 
-/* ================== Lógica de consolidación/tabla/gráfico ================== */
+/* ================== Consolidación / Tabla / Gráfico ================== */
 
 function consolidarResultadosPorProducto(resultados, roundData) {
   if (!roundData || !roundData.decisiones || !roundData.decisiones.products) {
@@ -117,27 +131,23 @@ function consolidarResultadosPorProducto(resultados, roundData) {
       resultado.facturacion ??
       0
     );
-
     const facturacionNeta = Number(
       resultado.facturacionNeta ??
       resultado.ingresosNetos ??
       resultado.ventasNetas ??
       0
     );
-
     const costeVentasProducto = Number(
       resultado.costeVentasProducto ??
       resultado.costeVentas ??
       resultado.cogs ??
       0
     );
-
     const margenBrutoProducto = Number(
       resultado.margenBrutoProducto ??
       (facturacionNeta - costeVentasProducto) ??
       0
     );
-
     const excedente = Number(
       resultado.excedente ??
       resultado.stockExcedente ??
@@ -181,13 +191,11 @@ function consolidarResultadosPorProducto(resultados, roundData) {
     totalesJugador.costesAlmacenaje += excedente * 20;
   });
 
-  // Publicidad y gastos comerciales (mejor mapeo)
+  // Publicidad y gastos comerciales
   const productosDecision = roundData.decisiones.products || [];
   Object.values(productosConsolidados).forEach((c, idx) => {
     const d = productosDecision[idx];
-
     if (d) {
-      // Soporta ambas claves: presupuestoPublicidad | publicidad
       c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0);
       totalesJugador.gastosPublicidad += c.gastosPublicidad;
     }
@@ -231,10 +239,7 @@ function validarTotales(roundData, totalesJugador) {
         break;
       }
     }
-    // No avises si ambos son 0
-    if (tv === 0 && gv === 0) continue;
-
-    // Avisa solo si la desviación supera el 1%
+    if (tv === 0 && gv === 0) continue; // sin ruido
     const diff = Math.abs(tv - gv);
     const base = Math.max(1, Math.abs(gv));
     if (diff / base > 0.01) {
@@ -306,7 +311,7 @@ function generarGraficoPorProducto(productosConsolidados) {
   const canvas = document.getElementById("gastosProductoChart");
   if (!canvas) return;
 
-  // Evita "Canvas is already in use..."
+  // Evitar "Canvas is already in use..."
   const prev = typeof Chart.getChart === "function"
     ? Chart.getChart("gastosProductoChart") || Chart.getChart(canvas)
     : null;

@@ -1,4 +1,4 @@
-// --- Utilidades ---
+// ===== Utilidades =====
 function formatearCanal(canal) {
   const mapa = { granDistribucion: "Gran Distribución", tiendaPropia: "Tienda Propia", minoristas: "Minoristas", online: "Online" };
   return mapa[canal] || canal;
@@ -12,9 +12,16 @@ function formatearSegmento(seg) {
   return m[seg] || seg;
 }
 function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
-function _matchJugador(row, playerName){
-  const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
-  return _norm(candidato) === _norm(playerName);
+function _matchRowByPlayer(row, playerName, playerKeyNorm){
+  const c = _norm(row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre);
+  if (playerKeyNorm) return c === playerKeyNorm || c.includes(playerKeyNorm) || playerKeyNorm.includes(c);
+  const p = _norm(playerName);
+  return c === p || c.includes(p) || p.includes(c);
+}
+function _myProductSet(roundsHistory){
+  const last = roundsHistory?.[roundsHistory.length-1];
+  const prods = (last?.decisiones?.products || []).map(p => p?.nombre).filter(Boolean);
+  return new Set(prods.map(_norm));
 }
 
 const coloresSegmentos = {
@@ -25,7 +32,7 @@ const coloresSegmentos = {
   innovadores: 'rgba(153, 102, 255, 0.7)'
 };
 
-// --- Globales ---
+// ===== Estado / Charts =====
 let chartVentasSegmento = null;
 let chartEvolucionVentas = null;
 const chartsSegmentoPorId = {};
@@ -33,6 +40,7 @@ const chartsSegmentoPorId = {};
 document.addEventListener('DOMContentLoaded', () => {
   const isIframe = window.self !== window.top;
   let playerName = null;
+  let playerKeyNorm = null;
   let roundsHistory = [];
   let resultados = [];
 
@@ -41,38 +49,49 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const ventasJugador = resultados.filter(r => _matchJugador(r, playerName));
+    // Por jugador (o fallback por producto)
+    let ventasJugador = resultados.filter(r => _matchRowByPlayer(r, playerName, playerKeyNorm));
+    if (ventasJugador.length === 0) {
+      const mySet = _myProductSet(roundsHistory);
+      ventasJugador = resultados.filter(r => mySet.has(_norm(r.producto)));
+      console.warn("[VENTAS] usando fallback por producto → filas:", ventasJugador.length);
+    }
 
     // General
     mostrarTablaPorProductoYCanal(ventasJugador);
     mostrarGraficoVentasPorSegmento(ventasJugador, "ventasSegmentoChart");
     mostrarGraficoEvolucion(roundsHistory);
-    mostrarCuotaPorSegmento(resultados, playerName, "tabla-cuota-segmento");
-    mostrarCuotaPorCanal(resultados, playerName, "tabla-cuota-canal");
+    mostrarCuotaPorSegmento(resultados, playerName, playerKeyNorm, "tabla-cuota-segmento");
+    mostrarCuotaPorCanal(resultados, playerName, playerKeyNorm, "tabla-cuota-canal");
 
     // Por producto
     const productosUnicos = [...new Set(ventasJugador.map(r => r.producto))];
     const contenedor = document.getElementById("contenedor-productos");
-    contenedor.innerHTML = ""; // limpiar antes de repintar
+    if (contenedor) {
+      contenedor.innerHTML = ""; // limpiar antes de repintar
+      productosUnicos.forEach(producto => {
+        const div = document.createElement("div");
+        div.classList.add("bloque-individual");
+        div.innerHTML = `
+          <h2>${producto}</h2>
+          <canvas id="ventasSegmento-${producto}"></canvas>
+          <div id="tablaCanal-${producto}"></div>
+          <div id="cuotaSegmento-${producto}"></div>
+          <div id="cuotaCanal-${producto}"></div>
+        `;
+        contenedor.appendChild(div);
 
-    productosUnicos.forEach(producto => {
-      const div = document.createElement("div");
-      div.classList.add("bloque-individual");
-      div.innerHTML = `
-        <h2>${producto}</h2>
-        <canvas id="ventasSegmento-${producto}"></canvas>
-        <div id="tablaCanal-${producto}"></div>
-        <div id="cuotaSegmento-${producto}"></div>
-        <div id="cuotaCanal-${producto}"></div>
-      `;
-      contenedor.appendChild(div);
+        const resultadosJugadorProducto = resultados.filter(
+          r => (_matchRowByPlayer(r, playerName, playerKeyNorm) || _myProductSet(roundsHistory).has(_norm(r.producto)))
+            && r.producto === producto
+        );
 
-      const resultadosJugadorProducto = resultados.filter(r => _matchJugador(r, playerName) && r.producto === producto);
-      mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, `ventasSegmento-${producto}`);
-      mostrarTablaCanal(resultadosJugadorProducto, `tablaCanal-${producto}`);
-      mostrarCuotaPorSegmento(resultados, playerName, `cuotaSegmento-${producto}`, producto);
-      mostrarCuotaPorCanal(resultados, playerName, `cuotaCanal-${producto}`, producto);
-    });
+        mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, `ventasSegmento-${producto}`);
+        mostrarTablaCanal(resultadosJugadorProducto, `tablaCanal-${producto}`);
+        mostrarCuotaPorSegmento(resultados, playerName, playerKeyNorm, `cuotaSegmento-${producto}`, producto);
+        mostrarCuotaPorCanal(resultados, playerName, playerKeyNorm, `cuotaCanal-${producto}`, producto);
+      });
+    }
   }
 
   if (isIframe) {
@@ -96,8 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (type === 'RESULTADOS_COMPLETOS') {
-        const { playerName: pn, roundsHistory: rh, resultados: res } = data;
+        const { playerName: pn, playerKeyNorm: pkn, roundsHistory: rh, resultados: res } = data;
         if (pn) playerName = pn;
+        if (pkn) playerKeyNorm = pkn;
         if (Array.isArray(rh)) roundsHistory = rh;
         if (Array.isArray(res)) resultados = res;
         tryRender();
@@ -107,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// === Render helpers ===
+// ===== Render helpers =====
 
 function mostrarTablaPorProductoYCanal(resultados) {
   const contenedor = document.getElementById("tabla-productos-canales");
@@ -163,7 +183,9 @@ function mostrarGraficoVentasPorSegmento(resultados, idCanvas) {
 }
 
 function mostrarGraficoEvolucion(roundsHistory) {
-  const ctx = document.getElementById("evolucionVentasChart").getContext("2d");
+  const c = document.getElementById("evolucionVentasChart");
+  if (!c) return;
+  const ctx = c.getContext("2d");
   const labels = roundsHistory.map((r, i) => `Ronda ${i + 1}`);
   const datos = roundsHistory.map(r => Number(r.facturacionNeta) || 0);
 
@@ -179,12 +201,13 @@ function mostrarGraficoEvolucion(roundsHistory) {
   });
 }
 
-function mostrarCuotaPorSegmento(resultados, playerName, idDiv, productoFiltrado = null) {
+function mostrarCuotaPorSegmento(resultados, playerName, playerKeyNorm, idDiv, productoFiltrado = null) {
   const totales = {}, jugador = {};
   resultados.forEach(({ segmento, jugador: nombre, unidadesVendidas, producto }) => {
     if (!segmento || isNaN(unidadesVendidas)) return;
     totales[segmento] = (totales[segmento] || 0) + Number(unidadesVendidas);
-    if (_matchJugador({ jugador: nombre }, playerName) && (!productoFiltrado || producto === productoFiltrado)) {
+    const match = _matchRowByPlayer({ jugador: nombre }, playerName, playerKeyNorm);
+    if (match && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[segmento] = (jugador[segmento] || 0) + Number(unidadesVendidas);
     }
   });
@@ -201,12 +224,13 @@ function mostrarCuotaPorSegmento(resultados, playerName, idDiv, productoFiltrado
   }</tbody></table>`;
 }
 
-function mostrarCuotaPorCanal(resultados, playerName, idDiv, productoFiltrado = null) {
+function mostrarCuotaPorCanal(resultados, playerName, playerKeyNorm, idDiv, productoFiltrado = null) {
   const totales = {}, jugador = {};
   resultados.forEach(({ canal, jugador: nombre, unidadesVendidas, producto }) => {
     if (!canal || isNaN(unidadesVendidas)) return;
     totales[canal] = (totales[canal] || 0) + Number(unidadesVendidas);
-    if (_matchJugador({ jugador: nombre }, playerName) && (!productoFiltrado || producto === productoFiltrado)) {
+    const match = _matchRowByPlayer({ jugador: nombre }, playerName, playerKeyNorm);
+    if (match && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[canal] = (jugador[canal] || 0) + Number(unidadesVendidas);
     }
   });
