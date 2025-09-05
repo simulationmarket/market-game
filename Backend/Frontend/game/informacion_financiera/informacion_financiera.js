@@ -70,57 +70,37 @@ document.addEventListener('DOMContentLoaded', function () {
   let lastResultadosCompletos = [];
 
   socket.on('syncPlayerData', (data) => {
-    // roundsHistory para CR general y para contexto de las otras vistas
-    const roundsHistory = data.roundsHistory || [];
-    lastRoundsHistory = roundsHistory;
-    if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
-  socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
-}
+  lastRoundsHistory = data.roundsHistory || [];
+  const payloadSync = { type: 'SYNC', playerName, roundsHistory: lastRoundsHistory };
 
-    sincronizarIframe(ifrCRGeneral, {
-      type: 'SYNC',
-      playerName,
-      partidaId,
-      roundsHistory
-    });
-
-    // Inicial, sin resultados completos aún
-    sincronizarIframe(ifrCRProducto, {
-      type: 'SYNC',
-      playerName,
-      partidaId,
-      roundsHistory,
-      resultados: lastResultadosCompletos
-    });
-
-    sincronizarIframe(ifrVentas, {
-      type: 'SYNC',
-      playerName,
-      partidaId,
-      roundsHistory,
-      resultados: lastResultadosCompletos
-    });
+  ['iframeCrProducto','iframeVentas','iframeCuentaResultados'].forEach(id => {
+    document.getElementById(id)?.contentWindow?.postMessage(payloadSync, '*');
   });
 
-  socket.on('resultadosCompletos', (resultados) => {
-    lastResultadosCompletos = Array.isArray(resultados) ? resultados : [];
+  // Si aún no tenemos resultados, vuelve a pedirlos
+  if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
+    socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+  }
+});
 
-    sincronizarIframe(ifrCRProducto, {
-      type: 'RESULTADOS_COMPLETOS',
-      playerName,
-      partidaId,
-      roundsHistory: lastRoundsHistory,
-      resultados: lastResultadosCompletos
-    });
 
-    sincronizarIframe(ifrVentas, {
-      type: 'RESULTADOS_COMPLETOS',
-      playerName,
-      partidaId,
-      roundsHistory: lastRoundsHistory,
-      resultados: lastResultadosCompletos
-    });
+
+  socket.on('resultadosCompletos', ({ resultados }) => {
+  lastResultadosCompletos = Array.isArray(resultados) ? resultados : [];
+  const payload = {
+    type: 'RESULTADOS_COMPLETOS',
+    playerName,
+    roundsHistory: lastRoundsHistory || [],
+    resultados: lastResultadosCompletos
+  };
+
+  ['iframeCrProducto','iframeVentas','iframeCuentaResultados'].forEach(id => {
+    document.getElementById(id)?.contentWindow?.postMessage(payload, '*');
   });
+
+  console.log('[INF.FIN.] reenviados resultados:', lastResultadosCompletos.length);
+});
+
 
   // Lógica de pestañas + disparo de solicitud de resultados completos
   navButtons.forEach((button) => {

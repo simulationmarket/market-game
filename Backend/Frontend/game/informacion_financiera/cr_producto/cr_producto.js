@@ -4,6 +4,25 @@ document.addEventListener('DOMContentLoaded', () => {
   let roundsHistory = [];
   let resultados = [];
 
+
+  function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
+function _matchJugador(row, playerName){
+  const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
+  return _norm(candidato) === _norm(playerName);
+}
+
+// Telemetría: ver qué llega
+window.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type === 'RESULTADOS_COMPLETOS' || d.type === 'SYNC') {
+    console.log(`[${location.pathname.split('/').pop()}] msg`, d.type, {
+      resultados: d.resultados?.length ?? 0,
+      roundsHistory: d.roundsHistory?.length ?? 0,
+      playerName: d.playerName
+    });
+  }
+});
+
   // Render gate: solo renderiza cuando hay jugador + roundsHistory + resultados
   function tryRender() {
     if (!playerName || !Array.isArray(roundsHistory) || roundsHistory.length === 0 || !Array.isArray(resultados) || resultados.length === 0) {
@@ -15,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roundData = roundsHistory[lastIndex];
 
     // Filtra resultados del jugador
-    const resultadosJugador = resultados.filter(r => r.jugador === playerName);
+    const resultadosJugador = resultados.filter(r => _matchJugador(r, playerName));
     if (resultadosJugador.length === 0) {
       // Limpia o muestra vacío
       const cont = document.getElementById("tabla-contenedor");
