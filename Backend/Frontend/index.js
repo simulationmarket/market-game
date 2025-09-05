@@ -11,6 +11,7 @@ const socket = io('/', {
   timeout: 20000
 });
 
+// Logs útiles
 socket.on('connect', () => console.log('[OK] conectado', socket.id));
 socket.on('connect_error', (e) => console.log('[connect_error]', e?.message, e));
 // --- Elementos de la UI ---
