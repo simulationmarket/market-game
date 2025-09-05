@@ -34,7 +34,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   } else {
     // Fallback fuera de iframe (poco común en tu flujo)
-    const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
+    const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],  // ✅ permite fallback
+  withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 20000
+});
     playerName = localStorage.getItem("playerName");
     if (!playerName) {
       alert("No se ha encontrado el nombre del jugador. Redirigiendo al inicio.");

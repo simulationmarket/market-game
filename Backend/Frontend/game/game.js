@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const socket = io({
-  transports: ['websocket'],
+  const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'], // ✅ no fuerces solo websocket
   withCredentials: true,
+  upgrade: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000

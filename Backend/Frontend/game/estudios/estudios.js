@@ -1,5 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
+  const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],  // ✅ permite fallback
+  withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 20000
+});
 
   // Lee partida y nombre desde la URL o, si no, desde localStorage
   const params = new URLSearchParams(location.search);

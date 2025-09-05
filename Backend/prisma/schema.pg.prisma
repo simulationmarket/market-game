@@ -45,7 +45,7 @@ model Ronda {
   partida    Partida  @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
   decisiones  Decision[]
-  resultado   ResultadoRonda?
+  resultado   ResultadoRonda?    // 1:1
 
   @@unique([partidaId, numero], name: "ronda_unica_por_partida")
   @@index([partidaId])
@@ -78,7 +78,7 @@ model ResultadoRonda {
   partidaId  String
   partida    Partida  @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
-  rondaId    String
+  rondaId    String   @unique           // ← CLAVE: 1:1 necesita FK única
   ronda      Ronda    @relation(fields: [rondaId], references: [id], onDelete: Cascade)
 
   @@unique([partidaId, rondaId], name: "resultado_unico_por_ronda")

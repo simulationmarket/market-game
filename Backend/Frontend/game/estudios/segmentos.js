@@ -1,7 +1,14 @@
 const activeCharts = {};
 
 document.addEventListener('DOMContentLoaded', function () {
-    const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
+    const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],  // ✅ permite fallback
+  withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 20000
+});
 
     // === MULTISALA + nombre del jugador ===
     const params = new URLSearchParams(location.search);

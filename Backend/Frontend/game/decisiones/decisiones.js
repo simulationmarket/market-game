@@ -1,5 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
+  const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],  // ✅ permite fallback
+  withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 20000
+});
 
   // === Multi-partida: obtener y preservar partidaId + playerName ===
   const params = new URLSearchParams(location.search);

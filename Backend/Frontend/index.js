@@ -2,14 +2,15 @@
 
 // ⚠️ Si en producción el backend está en OTRO dominio, pon la URL explícita:
 // const socket = io("https://tuapp.koyeb.app", {
-const socket = io({
-  transports: ['websocket'],     // evita long-polling detrás de proxy
-  withCredentials: true,         // alinea con CORS del servidor
+const socket = io('/', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'], // ✅ no fuerces solo websocket
+  withCredentials: true,
+  upgrade: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000
 });
-
 // --- Elementos de la UI ---
 const playerNameInput = document.getElementById("playerName");
 const partidaIdInput   = document.getElementById("partidaId");
