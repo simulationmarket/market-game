@@ -44,7 +44,10 @@ try {
 // ====== App / Server ======
 const app = express();
 app.set('trust proxy', 1); // Koyeb/Proxy
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false
+}));
 app.use(compression());
 app.use(express.json());
 
@@ -70,23 +73,36 @@ app.use(cors({
 
 const server = http.createServer(app);
 
+// Socket.IO: ruta explícita, CORS laxo, sin compresión del handshake
 const io = new Server(server, {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],
   cors: {
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (!allowedOrigins.length || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-        return cb(null, true);
-      }
-      return cb(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST'],
+    origin: true,            // acepta el Origin que venga (tu dominio Koyeb)
     credentials: true
   },
-  // Heartbeat razonable para móviles/redes inestables
+  httpCompression: false,    // evita rarezas de proxies con el upgrade
   pingInterval: 25000,
-  pingTimeout: 20000,
-  // path: '/socket.io' // (por defecto)
+  pingTimeout: 20000
 });
+
+// Logs útiles para ver si hace upgrade y por qué falla si falla
+io.engine.on('connection_error', (err) => {
+  console.log('[Engine.IO error]', {
+    code: err.code,
+    message: err.message,
+    origin: err.req?.headers?.origin,
+    url: err.req?.url
+  });
+});
+
+io.on('connection', (socket) => {
+  console.log('[WS connect]', socket.id, 'origin:', socket.handshake.headers.origin, 'transport:', socket.conn.transport.name);
+  socket.conn.on('upgrade', () => {
+    console.log('[WS upgrade]', socket.id, '->', socket.conn.transport.name);
+  });
+});
+
 
 // ====== (Opcional) Adapter Redis si un día escalas a 2+ instancias ======
 (async () => {

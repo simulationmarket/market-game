@@ -4,16 +4,18 @@
 // const socket = io("https://tuapp.koyeb.app", {
 const socket = io('/', {
   path: '/socket.io',
-  transports: ['websocket', 'polling'], // WS + fallback
+  transports: ['websocket', 'polling'],
   withCredentials: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000
 });
 
-// Logs útiles
-socket.on('connect', () => console.log('[OK] conectado', socket.id));
-socket.on('connect_error', (e) => console.log('[connect_error]', e?.message, e));
+console.log('transporte inicial:', socket.io.engine.transport.name);
+socket.io.engine.on('upgrade', () => {
+  console.log('upgrade a:', socket.io.engine.transport.name);
+});
+socket.on('connect_error', e => console.log('[connect_error]', e?.message));
 // --- Elementos de la UI ---
 const playerNameInput = document.getElementById("playerName");
 const partidaIdInput   = document.getElementById("partidaId");
