@@ -2,7 +2,7 @@ const EventEmitter = require('events');
 const eventEmitter = new EventEmitter();
 console.log("Exportando eventEmitter desde calculos:", eventEmitter);
 
-function iniciarCalculos(playersData, marketData) {
+function iniciarCalculos(playersData, marketData, meta = {}) {
     console.log("Iniciando cálculos...");
 
     // **1. Validar datos de entrada**
@@ -141,7 +141,10 @@ mostrarRepartoVentasProporcionalEnConsola(resultadosReparto);
         console.log('Cálculos completados y resultados mostrados en consola.');
 
         // **8. Emitir evento para `resultadosJugadores.js`**
-        eventEmitter.emit('calculosRealizados', playersData, marketData, resultadosFinales);
+        eventEmitter.emit('calculosRealizados', playersData, marketData, resultadosFinales, meta);
+            if (meta && meta.partidaId) {
+            eventEmitter.emit(`calculosRealizados:${meta.partidaId}`, playersData, marketData, resultadosFinales, meta);
+            }
 
         // Retornar los resultados finales para cualquier uso adicionalnode
         return resultadosFinales;

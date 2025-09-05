@@ -4,51 +4,53 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  // Guarda el archivo dentro de la carpeta prisma para orden:
+  // BD local dentro de la carpeta prisma
   url      = "file:./prisma/dev.db"
 }
 
 model Partida {
-  id           Int              @id @default(autoincrement())
-  codigo       String           @unique
-  estado       String
-  rondaActual  Int              @default(0)
+  id          Int       @id @default(autoincrement())
+  codigo      String    @unique
+  estado      String
+  rondaActual Int       @default(0)
+  createdAt   DateTime  @default(now())
 
-  rondas       Ronda[]
-  jugadores    Jugador[]
-  decisiones   Decision[]
-  resultados   ResultadoRonda[]
-
-  createdAt    DateTime         @default(now())
+  // Relaciones
+  jugadores   Jugador[]
+  rondas      Ronda[]
+  decisiones  Decision[]
+  resultados  ResultadoRonda[]
 }
 
 model Jugador {
-  id         Int       @id @default(autoincrement())
-  nombre     String
-  esBot      Boolean   @default(false)
-  budget     Int       @default(0)
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  esBot     Boolean   @default(false)
+  budget    BigInt    @default(0)
+  createdAt DateTime  @default(now())
 
-  partidaId  Int
-  partida    Partida   @relation(fields: [partidaId], references: [id])
+  partidaId Int
+  partida   Partida   @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
   decisiones Decision[]
 
-  createdAt  DateTime  @default(now())
+  @@unique([partidaId, nombre], name: "jugador_unico_por_partida")
+  @@index([partidaId])
 }
 
 model Ronda {
   id         Int       @id @default(autoincrement())
   numero     Int
-
-  partidaId  Int
-  partida    Partida   @relation(fields: [partidaId], references: [id])
-
-  decisiones Decision[]
-  resultados ResultadoRonda[]
-
   createdAt  DateTime  @default(now())
 
+  partidaId  Int
+  partida    Partida   @relation(fields: [partidaId], references: [id], onDelete: Cascade)
+
+  decisiones  Decision[]
+  resultado   ResultadoRonda?
+
   @@unique([partidaId, numero], name: "ronda_unica_por_partida")
+  @@index([partidaId])
 }
 
 model Decision {
@@ -57,13 +59,17 @@ model Decision {
   createdAt  DateTime  @default(now())
 
   jugadorId  Int
-  jugador    Jugador   @relation(fields: [jugadorId], references: [id])
+  jugador    Jugador   @relation(fields: [jugadorId], references: [id], onDelete: Cascade)
 
   partidaId  Int
-  partida    Partida   @relation(fields: [partidaId], references: [id])
+  partida    Partida   @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
   rondaId    Int
-  ronda      Ronda     @relation(fields: [rondaId], references: [id])
+  ronda      Ronda     @relation(fields: [rondaId], references: [id], onDelete: Cascade)
+
+  @@index([partidaId])
+  @@index([rondaId])
+  @@index([jugadorId])
 }
 
 model ResultadoRonda {
@@ -72,10 +78,12 @@ model ResultadoRonda {
   createdAt  DateTime  @default(now())
 
   partidaId  Int
-  partida    Partida   @relation(fields: [partidaId], references: [id])
+  partida    Partida   @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
   rondaId    Int
-  ronda      Ronda     @relation(fields: [rondaId], references: [id])
+  ronda      Ronda     @relation(fields: [rondaId], references: [id], onDelete: Cascade)
 
   @@unique([partidaId, rondaId], name: "resultado_unico_por_ronda")
+  @@index([partidaId])
+  @@index([rondaId])
 }

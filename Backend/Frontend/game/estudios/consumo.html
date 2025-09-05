@@ -1,103 +1,99 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consumo y Gasto por Segmentos</title>
-    <link rel="stylesheet" href="consumo.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Consumo y Gasto por Segmentos</title>
+  <link rel="stylesheet" href="consumo.css"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Consumo Total por Segmentos</h1>
-        <div class="chart-container">
-            <canvas id="consumoChart"></canvas>
-        </div>
+  <div class="container">
+    <h1>Consumo Total por Segmentos</h1>
+    <div class="chart-container">
+      <canvas id="consumoChart"></canvas>
+    </div>
 
-        <h2>Consumo por Segmento y Canal</h2>
-        <div class="row">
-            <!-- Primera fila -->
-            <div class="chart-item">
-                <h3>Profesionales</h3>
-                <canvas id="consumoProfesionales"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Altos Ingresos</h3>
-                <canvas id="consumoAltosIngresos"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Gran Consumidor</h3>
-                <canvas id="consumoGranConsumidor"></canvas>
-            </div>
-        </div>
-        <div class="row">
-            <!-- Segunda fila -->
-            <div class="chart-item">
-                <h3>Bajos Ingresos</h3>
-                <canvas id="consumoBajosIngresos"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Innovadores</h3>
-                <canvas id="consumoInnovadores"></canvas>
-            </div>
-        </div>
+    <h2>Consumo por Segmento y Canal</h2>
+    <div class="row">
+      <div class="chart-item">
+        <h3>Profesionales</h3>
+        <canvas id="consumoProfesionales"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Altos Ingresos</h3>
+        <canvas id="consumoAltosIngresos"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Gran Consumidor</h3>
+        <canvas id="consumoGranConsumidor"></canvas>
+      </div>
+    </div>
+    <div class="row">
+      <div class="chart-item">
+        <h3>Bajos Ingresos</h3>
+        <canvas id="consumoBajosIngresos"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Innovadores</h3>
+        <canvas id="consumoInnovadores"></canvas>
+      </div>
+    </div>
 
-        <h2>Gasto Promedio por Segmento y Canal</h2>
-        <div class="row">
-            <!-- Primera fila -->
-            <div class="chart-item">
-                <h3>Profesionales</h3>
-                <canvas id="gastoProfesionales"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Altos Ingresos</h3>
-                <canvas id="gastoAltosIngresos"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Gran Consumidor</h3>
-                <canvas id="gastoGranConsumidor"></canvas>
-            </div>
-        </div>
-        <div class="row">
-            <!-- Segunda fila -->
-            <div class="chart-item">
-                <h3>Bajos Ingresos</h3>
-                <canvas id="gastoBajosIngresos"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Innovadores</h3>
-                <canvas id="gastoInnovadores"></canvas>
-            </div>
-        </div>
+    <h2>Gasto Promedio por Segmento y Canal</h2>
+    <div class="row">
+      <div class="chart-item">
+        <h3>Profesionales</h3>
+        <canvas id="gastoProfesionales"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Altos Ingresos</h3>
+        <canvas id="gastoAltosIngresos"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Gran Consumidor</h3>
+        <canvas id="gastoGranConsumidor"></canvas>
+      </div>
+    </div>
+    <div class="row">
+      <div class="chart-item">
+        <h3>Bajos Ingresos</h3>
+        <canvas id="gastoBajosIngresos"></canvas>
+      </div>
+      <div class="chart-item">
+        <h3>Innovadores</h3>
+        <canvas id="gastoInnovadores"></canvas>
+      </div>
+    </div>
 
-        
-        <h2>Porcentaje de Consumo por Producto</h2>
-<div class="row">
-    <div class="chart-item">
+    <h2>Porcentaje de Consumo por Producto</h2>
+    <div class="row">
+      <div class="chart-item">
         <h3>Profesionales</h3>
         <canvas id="porcentajeProfesionales"></canvas>
-    </div>
-    <div class="chart-item">
+      </div>
+      <div class="chart-item">
         <h3>Altos Ingresos</h3>
         <canvas id="porcentajeAltosIngresos"></canvas>
-    </div>
-    <div class="chart-item">
+      </div>
+      <div class="chart-item">
         <h3>Gran Consumidor</h3>
         <canvas id="porcentajeGranConsumidor"></canvas>
+      </div>
     </div>
-</div>
-<div class="row">
-    <div class="chart-item">
+    <div class="row">
+      <div class="chart-item">
         <h3>Bajos Ingresos</h3>
         <canvas id="porcentajeBajosIngresos"></canvas>
-    </div>
-    <div class="chart-item">
+      </div>
+      <div class="chart-item">
         <h3>Innovadores</h3>
         <canvas id="porcentajeInnovadores"></canvas>
+      </div>
     </div>
-</div>
-    </div>
-    <script src="consumo.js"></script>
+  </div>
+
+  <script src="consumo.js"></script>
 </body>
 </html>

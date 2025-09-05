@@ -1,4 +1,4 @@
-const socket = io();
+const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
 
 // Colores fijos para jugadores
 const fixedColorMap = {

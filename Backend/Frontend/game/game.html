@@ -8,59 +8,60 @@
 </head>
 <body>
     <div class="top-bar">
-       
         <span id="ronda">Ronda:</span> 
         <button id="submit_decisions">Enviar Decisiones</button>
         <div id="budget">Presupuesto: <span id="budgetAmount" class="positive">130.000.000 €</span></div>
         <div id="reservas">Reservas: <span id="reservesAmount" class="positive">0 €</span></div>
 
-        <!-- Ajuste de los IDs para que coincidan con game.js -->
         <button id="addReserve">Añadir a Reservas</button>
         <button id="removeReserve">Quitar de Reservas</button>
     </div>
+
     <div class="container">
         <div class="sidebar">
-            <button onclick="location.href='./informacion_financiera/informacion_financiera.html'">Información Financiera</button>
-            <button onclick="location.href='./estudios/estudios.html'">Estudios</button>
-            <button onclick="location.href='./investigacion_desarrollo/investigacion_desarrollo.html'">I+D</button>
-            <button onclick="location.href='./productos/productos.html'">Productos</button>
-            <button onclick="location.href='./banco/banco.html'">Banco</button>
-            <button onclick="location.href='./decisiones/decisiones.html'">Decisiones</button>
-            <button onclick="location.href='./proyeccion/proyeccion.html'">Proyección</button>
+            <!-- Usamos navigateTo() para preservar partidaId en la URL -->
+            <button onclick="navigateTo('./informacion_financiera/informacion_financiera.html')">Información Financiera</button>
+            <button onclick="navigateTo('./estudios/estudios.html')">Estudios</button>
+            <button onclick="navigateTo('./investigacion_desarrollo/investigacion_desarrollo.html')">I+D</button>
+            <button onclick="navigateTo('./productos/productos.html')">Productos</button>
+            <button onclick="navigateTo('./banco/banco.html')">Banco</button>
+            <button onclick="navigateTo('./decisiones/decisiones.html')">Decisiones</button>
+            <button onclick="navigateTo('./proyeccion/proyeccion.html')">Proyección</button>
         </div>
     </div>
 
-    <!-- Cuadro de diálogo de confirmación para enviar decisiones -->
+    <!-- Diálogo confirmación envío decisiones -->
     <div id="confirmationDialog" class="hidden">
         <p>¿Estás seguro que quieres enviar las decisiones para esta Ronda? Si aceptas ya no las podrás modificar.</p>
         <button id="confirmSubmit">Aceptar</button>
         <button id="cancelSubmit">Cancelar</button>
     </div>
-    <!-- Pantalla de espera hasta que todos los jugadores estén listos -->
+
+    <!-- Pantalla esperando a otros -->
     <div id="waitingForOthersScreen" class="hidden">
-    <p>Esperando a los demás jugadores...</p>
+        <p>Esperando a los demás jugadores...</p>
     </div>
-    <!-- Pantalla de cálculo de resultados -->
+
+    <!-- Pantalla calculando resultados -->
     <div id="calculatingResultsScreen" class="hidden">
         <h1>Calculando Resultados de Ronda</h1>
     </div>
 
-    <!-- Cuadro de diálogo de confirmación para reservas -->
+    <!-- Diálogo reservas -->
     <div id="reservasDialog" class="hidden">
         <p id="reservasDialogText"></p>
         <button id="confirmReservas">Aceptar</button>
         <button id="cancelReservas">Cancelar</button>
     </div>
 
+    <!-- Overlays -->
     <div id="resultadosOverlay" class="hidden">
-  <div id="resultadosContent"></div>
-</div>
+      <div id="resultadosContent"></div>
+    </div>
 
-<div id="finalOverlay" class="hidden">
-  <div id="finalContent"></div>
-</div>
-
-
+    <div id="finalOverlay" class="hidden">
+      <div id="finalContent"></div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="overlay.css">
@@ -69,6 +70,5 @@
     <script src="finalOverlay.js"></script>
     <script src="game.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 </body>
 </html>

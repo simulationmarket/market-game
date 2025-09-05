@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estudios</title>
-    <link rel="stylesheet" href="estudios.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Estudios</title>
+  <link rel="stylesheet" href="estudios.css" />
 </head>
 <body>
-    <div class="sidebar">
-        <button id="segmentos-btn" class="sidebar-btn">Segmentos</button>
-        <button id="consumo-btn" class="sidebar-btn">Consumo</button>
-        <button id="benchmark-btn" class="sidebar-btn">Benchmark</button>
-        <button id="volver-btn" class="sidebar-btn">Volver</button> <!-- Botón para volver -->
-    </div>
-    <div class="main-content">
-        <iframe id="iframe-content" src="segmentos.html"></iframe>
-    </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="estudios.js"></script>
+  <div class="sidebar">
+    <button id="segmentos-btn" class="sidebar-btn">Segmentos</button>
+    <button id="consumo-btn" class="sidebar-btn">Consumo</button>
+    <button id="benchmark-btn" class="sidebar-btn">Benchmark</button>
+    <button id="volver-btn" class="sidebar-btn">Volver</button>
+  </div>
+
+  <div class="main-content">
+    <!-- Importante: sin src inicial; lo ponemos desde estudios.js con ?partidaId&playerName -->
+    <iframe id="iframe-content"></iframe>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="estudios.js"></script>
 </body>
 </html>
+

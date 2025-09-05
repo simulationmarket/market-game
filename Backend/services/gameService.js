@@ -1,9 +1,9 @@
 // services/gameService.js
 /**
- * Orquestador de persistencia y estado mínimo:
+ * Orquestador de persistencia y estado mínimo por partida.
  * - No hace listen()
- * - No toca tu estructura players ni tus cálculos
- * - Persiste si Prisma está disponible (silencioso si falla)
+ * - Trabaja con el estado inyectado (players, resultados, etc.)
+ * - Persiste en Prisma si está disponible (silencioso si falla)
  */
 
 let prisma = null;
@@ -16,15 +16,37 @@ function createGameService(deps = {}) {
     resultados = {},
     marketData = {},
     iniciarCalculos = async () => {},
-    eventEmitter = { emit: () => {} },
+    eventEmitter = { emit: () => {}, on: () => {}, once: () => {} },
     tomarDecisionesBot = () => {},
+    // opcional: si quieres inicializar el código de partida desde fuera
+    partidaCodigo = null,
   } = deps;
 
   const state = {
-    partida: { codigo: null, estado: 'inscripcion', rondaActual: 0 },
+    partida: { codigo: partidaCodigo || null, estado: 'inscripcion', rondaActual: 0 },
   };
 
   const generateCode = () => Math.random().toString(36).slice(2, 7).toUpperCase();
+
+  /** Asegura que existe una partida con código (opcionalmente usando uno dado). */
+  async function ensureCodigo(codigoPreferido = null) {
+    if (state.partida.codigo) return state.partida.codigo;
+
+    const codigo = codigoPreferido || generateCode();
+    state.partida = { codigo, estado: 'inscripcion', rondaActual: 0 };
+    eventEmitter.emit('partidaCreada', { codigo });
+
+    if (prisma) {
+      try {
+        await prisma.partida.upsert({
+          where: { codigo },
+          update: { estado: 'inscripcion', rondaActual: 0 },
+          create: { codigo, estado: 'inscripcion' },
+        });
+      } catch (_) {}
+    }
+    return codigo;
+  }
 
   return {
     // Debug/estado
@@ -35,20 +57,19 @@ function createGameService(deps = {}) {
       };
     },
 
-    // Inscripción
-    crearPartida(codigo) {
-      const _codigo = codigo || generateCode();
-      state.partida = { codigo: _codigo, estado: 'inscripcion', rondaActual: 0 };
-      eventEmitter.emit('partidaCreada', { codigo: _codigo });
+    /** Inicializa/garantiza el código de partida (recomendado: usar el partidaId como código). */
+    ensurePartida(codigo) {
+      return ensureCodigo(codigo);
+    },
 
-      if (prisma) {
-        prisma.partida.upsert({
-          where: { codigo: _codigo },
-          update: { estado: 'inscripcion', rondaActual: 0 },
-          create: { codigo: _codigo, estado: 'inscripcion' },
-        }).catch(() => {});
-      }
-      return { ...state.partida };
+    /** (Conveniencia) Obtiene el código actual de la partida. */
+    getCodigoPartida() {
+      return state.partida.codigo || null;
+    },
+
+    // Inscripción (útil si quieres usar esta capa para alta/baja)
+    crearPartida(codigo) {
+      return this.ensurePartida(codigo);
     },
 
     unirsePartida({ nombre, esBot = false }) {
@@ -109,10 +130,13 @@ function createGameService(deps = {}) {
       return true;
     },
 
-    // ===== Persistencia JSON segura =====
+    // ===== Persistencia JSON segura (Prisma) =====
     async guardarDecision({ nombre, decision }) {
       try {
-        if (!prisma || !state.partida.codigo) return false;
+        if (!prisma) return false;
+
+        // Asegura código de partida antes de persistir (si no estaba)
+        await ensureCodigo();
 
         const partida = await prisma.partida.findUnique({
           where: { codigo: state.partida.codigo }
@@ -123,8 +147,12 @@ function createGameService(deps = {}) {
           where: { partidaId: partida.id, nombre }
         });
         if (!jugador) {
+          // Si existe en memoria y es bot, úsalo; si no, asume humano
+          const esBot = !!Object.values(players).find(p =>
+            (p.nombreEmpresa === nombre || p.nombre === nombre) && p.esBot);
+
           jugador = await prisma.jugador.create({
-            data: { nombre, esBot: false, budget: 0, partidaId: partida.id }
+            data: { nombre, esBot, budget: 0, partidaId: partida.id }
           });
         }
 
@@ -156,7 +184,10 @@ function createGameService(deps = {}) {
 
     async guardarResultadosRonda({ rondaNumero, data }) {
       try {
-        if (!prisma || !state.partida.codigo) return false;
+        if (!prisma) return false;
+
+        // Asegura código de partida antes de persistir (si no estaba)
+        await ensureCodigo();
 
         const partida = await prisma.partida.findUnique({
           where: { codigo: state.partida.codigo }
@@ -192,7 +223,9 @@ function createGameService(deps = {}) {
 
     // Cierra ronda invocando tu motor y publicando eventos
     async cerrarRonda() {
-      await iniciarCalculos(players, marketData);
+      // ★ Pasa meta con partidaId para emitir también el evento namespaced
+      await iniciarCalculos(players, marketData, { partidaId: state.partida.codigo });
+
       const ronda = ++state.partida.rondaActual;
 
       if (prisma && state.partida.codigo) {

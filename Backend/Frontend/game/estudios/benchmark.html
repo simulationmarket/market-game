@@ -1,49 +1,31 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados del Benchmark</title>
-    <link rel="stylesheet" href="consumo.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados del Benchmark</title>
+  <link rel="stylesheet" href="consumo.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 </head>
 <body>
-    <div class="container">
-        <!-- Bloque: Posicionamiento -->
-        <h1>Posicionamiento</h1>
-        <div class="chart-container">
-            <canvas id="posicionamientoChart"></canvas>
-        </div>
+  <div class="container">
+    <h1>Posicionamiento</h1>
+    <div class="chart-container"><canvas id="posicionamientoChart"></canvas></div>
 
-        <!-- Bloque: Precios Medios -->
-        <h1>Precios Medios</h1>
-        <div id="precios-container" class="row"></div>
+    <h1>Precios Medios</h1>
+    <div id="precios-container" class="row"></div>
 
-        <!-- Bloque: Cuota de Canal -->
-        <h1>Cuota de Canal</h1>
-        <div class="row">
-            <div class="chart-item">
-                <h3>Gran Distribución</h3>
-                <canvas id="canal1Chart"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Minoristas</h3>
-                <canvas id="canal2Chart"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Online</h3>
-                <canvas id="canal3Chart"></canvas>
-            </div>
-            <div class="chart-item">
-                <h3>Tienda Propia</h3>
-                <canvas id="canal4Chart"></canvas>
-            </div>
-        </div>
+    <h1>Cuota de Canal</h1>
+    <div class="row">
+      <div class="chart-item"><h3>Gran Distribución</h3><canvas id="canal1Chart"></canvas></div>
+      <div class="chart-item"><h3>Minoristas</h3><canvas id="canal2Chart"></canvas></div>
+      <div class="chart-item"><h3>Online</h3><canvas id="canal3Chart"></canvas></div>
+      <div class="chart-item"><h3>Tienda Propia</h3><canvas id="canal4Chart"></canvas></div>
     </div>
+  </div>
 
-    <!-- Archivo JavaScript principal -->
-    <script src="benchmark.js"></script>
+  <script src="benchmark.js"></script>
 </body>
 </html>

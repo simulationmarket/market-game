@@ -8,7 +8,8 @@ Thumbs.db
 
 # ===== Backend =====
 Backend/node_modules/
-Backend/prisma/dev.db
+prisma/dev.db
+prisma/dev.db-journal
 
 # ===== Frontend =====
 Frontend/node_modules/

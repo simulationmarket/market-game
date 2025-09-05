@@ -1,18 +1,43 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Market Simulation Game</title>
-  <link rel="stylesheet" href="index.css">
-  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    /* Pequeños estilos por si tu index.css no tiene estos */
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .row > * { flex: 1 1 auto; }
+    .muted { font-size: .9rem; opacity:.75; }
+    .copybtn { white-space: nowrap; }
+    input[type="text"] { padding:.6rem .8rem; border:1px solid #ddd; border-radius:8px; font-size:1rem; width:100%; }
+    button { padding:.7rem 1rem; border:0; border-radius:10px; font-weight:700; cursor:pointer; }
+    #readyButton { background:#2ecc71; color:white; }
+    #newCodeBtn { background:#3498db; color:white; }
+    #copyLink { background:#8e44ad; color:white; }
+    .status-text { margin-top:.5rem; }
+    .container { max-width:620px; margin:6vh auto; display:flex; flex-direction:column; gap:12px; text-align:center; }
+    .logo { width:96px; margin:0 auto 12px; }
+  </style>
 </head>
 <body>
   <div class="container fade-in">
     <img src="logo.png" alt="Logo del juego" class="logo" />
     <h1>Bienvenido al Juego de Simulación de Mercado</h1>
-    <label for="playerName">Nombre de la Empresa:</label>
-    <input type="text" id="playerName" placeholder="Escribe tu nombre...">
+
+    <label for="playerName">Nombre de la Empresa</label>
+    <input type="text" id="playerName" placeholder="Escribe tu nombre..." />
+
+    <label for="partidaId">Código de partida</label>
+    <div class="row">
+      <input type="text" id="partidaId" placeholder="Ej. ABC12" maxlength="20" />
+      <button id="newCodeBtn" type="button" title="Crear un código aleatorio">Crear código</button>
+      <button id="copyLink" class="copybtn" type="button" title="Copiar enlace de invitación">Copiar enlace</button>
+    </div>
+    <p class="muted">Comparte el código o el enlace para que tus amigos entren en la misma partida.</p>
+
     <button id="readyButton">Estoy Listo</button>
     <div id="status" class="status-text"></div>
     <div id="temporizador" class="status-text" style="margin-top: 10px;"></div>

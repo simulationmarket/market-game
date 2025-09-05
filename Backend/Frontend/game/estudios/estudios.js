@@ -1,50 +1,58 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const socket = io();
+document.addEventListener('DOMContentLoaded', () => {
+  const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
 
-    // Recuperar el nombre del jugador almacenado en localStorage
-    const playerName = localStorage.getItem("playerName");
-    if (!playerName) {
-        alert("No se ha encontrado el nombre del jugador. Redirigiendo al inicio.");
-        window.location.href = "index.html";
-        return;
-    }
+  // Lee partida y nombre desde la URL o, si no, desde localStorage
+  const params = new URLSearchParams(location.search);
+  const partidaId  = params.get('partidaId')  || localStorage.getItem('partidaId')  || 'default';
+  const playerName = params.get('playerName') || localStorage.getItem('playerName') || '';
 
-    // Emitir evento para identificar al jugador
-    socket.emit("identificarJugador", playerName);
+  if (!playerName) {
+    alert('No se ha encontrado el nombre del jugador. Volviendo al inicio.');
+    location.href = 'index.html';
+    return;
+  }
 
-    const btnConsumo = document.getElementById('consumo-btn');
-    const btnSegmentos = document.getElementById('segmentos-btn');
-    const btnBenchmark = document.getElementById('benchmark-btn');
+  // Persistimos para que las páginas hijas (iframes) lo lean en fallback
+  localStorage.setItem('partidaId', partidaId);
+  localStorage.setItem('playerName', playerName);
 
-    const iframe = document.getElementById('iframe-content');
+  // Identificarse y unirse a la sala de la partida
+  socket.emit('identificarJugador', playerName);
+  socket.emit('joinGame', { partidaId, nombre: playerName });
 
-    if (btnConsumo) {
-        btnConsumo.addEventListener('click', function () {
-            iframe.src = 'consumo.html';
-        });
-    }
+  socket.on('connect', () => {
+    socket.emit('identificarJugador', playerName);
+    socket.emit('joinGame', { partidaId, nombre: playerName });
+  });
 
-    if (btnSegmentos) {
-        btnSegmentos.addEventListener('click', function () {
-            iframe.src = 'segmentos.html';
-        });
-    }
+  const iframe       = document.getElementById('iframe-content');
+  const btnSegmentos = document.getElementById('segmentos-btn');
+  const btnConsumo   = document.getElementById('consumo-btn');
+  const btnBenchmark = document.getElementById('benchmark-btn');
+  const btnVolver    = document.getElementById('volver-btn');
 
-    if (btnBenchmark) {
-        btnBenchmark.addEventListener('click', function () {
-            iframe.src = 'benchmark.html';
-        });
-    }
+  // Helper para construir URL con query
+  const withQuery = (path) => {
+    const u = new URL(path, location.href);
+    u.searchParams.set('partidaId', partidaId);
+    u.searchParams.set('playerName', playerName);
+    return u.pathname + '?' + u.searchParams.toString();
+  };
 
-    // Cargar por defecto la página de segmentos
-    iframe.src = 'segmentos.html';
+  // Carga inicial
+  iframe.src = withQuery('segmentos.html');
 
-    const btnVolver = document.getElementById('volver-btn');
+  // Navegación
+  if (btnSegmentos) btnSegmentos.addEventListener('click', () => { iframe.src = withQuery('segmentos.html'); });
+  if (btnConsumo)   btnConsumo.addEventListener('click',   () => { iframe.src = withQuery('consumo.html'); });
+  if (btnBenchmark) btnBenchmark.addEventListener('click', () => { iframe.src = withQuery('benchmark.html'); });
 
-if (btnVolver) {
-    btnVolver.addEventListener('click', function () {
-        window.location.href = '../game.html'; // Redirige a game.html
+  if (btnVolver) {
+    btnVolver.addEventListener('click', () => {
+      const u = new URL('../game.html', location.href);
+      u.searchParams.set('partidaId', partidaId);
+      u.searchParams.set('playerName', playerName);
+      location.href = u.pathname + '?' + u.searchParams.toString();
     });
-}
-
+  }
 });

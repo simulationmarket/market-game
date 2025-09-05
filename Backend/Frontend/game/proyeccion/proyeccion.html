@@ -1,131 +1,130 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proyección - Cuenta de Resultados</title>
-    <link rel="stylesheet" href="proyeccion.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Proyección - Cuenta de Resultados</title>
+  <link rel="stylesheet" href="proyeccion.css" />
 </head>
 <body>
-    <h1>Proyección de Cuenta de Resultados</h1>
-    <div class="container">
-        <table id="cuenta-resultados">
-            <thead>
-                <tr>
-                    <th>Partida</th>
-                    <th>Valor (€)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Facturación total -->
-                <tr class="expandable" onclick="toggleDetalle('facturacion-detalle')">
-                    <td>Facturación total <span class="toggle-icon">▶</span></td>
-                    <td id="facturacion-total">0 €</td>
-                </tr>
-                <tr class="detalle" id="facturacion-detalle">
-                    <td colspan="2">
-                        <ul id="detalle-facturacion-lista"></ul>
-                    </td>
-                </tr>
+  <h1>Proyección de Cuenta de Resultados</h1>
 
-                <!-- Coste de ventas -->
-                <tr class="expandable" onclick="toggleDetalle('coste-ventas-detalle')">
-                    <td>Coste de ventas <span class="toggle-icon">▶</span></td>
-                    <td id="coste-ventas">0 €</td>
-                </tr>
-                <tr class="detalle" id="coste-ventas-detalle">
-                    <td colspan="2">
-                        <ul id="detalle-coste-ventas-lista"></ul>
-                    </td>
-                </tr>
+  <div class="container">
+    <table id="cuenta-resultados">
+      <thead>
+        <tr>
+          <th>Partida</th>
+          <th>Valor (€)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Facturación total -->
+        <tr class="expandable" onclick="toggleDetalle('facturacion-detalle')">
+          <td>Facturación total <span class="toggle-icon">▶</span></td>
+          <td id="facturacion-total">0 €</td>
+        </tr>
+        <tr class="detalle" id="facturacion-detalle">
+          <td colspan="2">
+            <ul id="detalle-facturacion-lista"></ul>
+          </td>
+        </tr>
 
-                <!-- Margen bruto -->
-                <tr class="expandable" onclick="toggleDetalle('margen-bruto-detalle')">
-                    <td>Margen Bruto <span class="toggle-icon">▶</span></td>
-                    <td id="margen-bruto">0 €</td>
-                </tr>
-                <tr class="detalle" id="margen-bruto-detalle">
-                    <td colspan="2">
-                        <ul id="detalle-margen-bruto-lista"></ul>
-                    </td>
-                </tr>
+        <!-- Coste de ventas -->
+        <tr class="expandable" onclick="toggleDetalle('coste-ventas-detalle')">
+          <td>Coste de ventas <span class="toggle-icon">▶</span></td>
+          <td id="coste-ventas">0 €</td>
+        </tr>
+        <tr class="detalle" id="coste-ventas-detalle">
+          <td colspan="2">
+            <ul id="detalle-coste-ventas-lista"></ul>
+          </td>
+        </tr>
 
-                <!-- Gastos Operativos -->
-                <tr class="expandable" onclick="toggleDetalle('gastos-operativos-detalle')">
-                    <td>Gastos Operativos <span class="toggle-icon">▶</span></td>
-                    <td id="gastos-operativos">0 €</td>
-                </tr>
-                <tr class="detalle" id="gastos-operativos-detalle">
-                    <td colspan="2">
-                        <table>
-                            <!-- Gastos Publicitarios -->
-                            <tr class="expandable" onclick="toggleDetalle('gastos-publicitarios-detalle')">
-                                <td>Gastos Publicitarios <span class="toggle-icon">▶</span></td>
-                                <td id="gastos-publicitarios">0 €</td>
-                            </tr>
-                            <tr class="detalle" id="gastos-publicitarios-detalle">
-                                <td colspan="2">
-                                    <ul id="detalle-publicidad-lista"></ul>
-                                </td>
-                            </tr>
+        <!-- Margen bruto -->
+        <tr class="expandable" onclick="toggleDetalle('margen-bruto-detalle')">
+          <td>Margen Bruto <span class="toggle-icon">▶</span></td>
+          <td id="margen-bruto">0 €</td>
+        </tr>
+        <tr class="detalle" id="margen-bruto-detalle">
+          <td colspan="2">
+            <ul id="detalle-margen-bruto-lista"></ul>
+          </td>
+        </tr>
 
-                            <!-- Gastos Comerciales -->
-                            <tr class="expandable" onclick="toggleDetalle('gastos-comerciales-detalle')">
-                                <td>Gastos Comerciales <span class="toggle-icon">▶</span></td>
-                                <td id="gastos-comerciales">0 €</td>
-                            </tr>
-                            <tr class="detalle" id="gastos-comerciales-detalle">
-                                <td colspan="2">
-                                    <ul id="detalle-comercial-lista"></ul>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
+        <!-- Gastos Operativos -->
+        <tr class="expandable" onclick="toggleDetalle('gastos-operativos-detalle')">
+          <td>Gastos Operativos <span class="toggle-icon">▶</span></td>
+          <td id="gastos-operativos">0 €</td>
+        </tr>
+        <tr class="detalle" id="gastos-operativos-detalle">
+          <td colspan="2">
+            <table>
+              <!-- Gastos Publicitarios -->
+              <tr class="expandable" onclick="toggleDetalle('gastos-publicitarios-detalle')">
+                <td>Gastos Publicitarios <span class="toggle-icon">▶</span></td>
+                <td id="gastos-publicitarios">0 €</td>
+              </tr>
+              <tr class="detalle" id="gastos-publicitarios-detalle">
+                <td colspan="2">
+                  <ul id="detalle-publicidad-lista"></ul>
+                </td>
+              </tr>
 
-                <!-- BAII -->
-                <tr class="expandable">
-                    <td>BAII (Beneficio Antes de Intereses e Impuestos)</td>
-                    <td id="baii">0 €</td>
-                </tr>
+              <!-- Gastos Comerciales -->
+              <tr class="expandable" onclick="toggleDetalle('gastos-comerciales-detalle')">
+                <td>Gastos Comerciales <span class="toggle-icon">▶</span></td>
+                <td id="gastos-comerciales">0 €</td>
+              </tr>
+              <tr class="detalle" id="gastos-comerciales-detalle">
+                <td colspan="2">
+                  <ul id="detalle-comercial-lista"></ul>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-                <!-- Gastos Financieros -->
-                <tr class="expandable" onclick="toggleDetalle('gastos-financieros-detalle')">
-                    <td>Gastos Financieros <span class="toggle-icon">▶</span></td>
-                    <td id="gastos-financieros">0 €</td>
-                </tr>
-                <tr class="detalle" id="gastos-financieros-detalle">
-                    <td colspan="2">
-                        <ul id="detalle-financiero-lista"></ul>
-                    </td>
-                </tr>
+        <!-- BAII -->
+        <tr class="expandable">
+          <td>BAII (Beneficio Antes de Intereses e Impuestos)</td>
+          <td id="baii">0 €</td>
+        </tr>
 
-                <!-- BAI (como categoría principal) -->
-                <tr class="expandable">
-                    <td>BAI (Beneficio Antes de Impuestos)</td>
-                    <td id="bai">0 €</td>
-                </tr>
+        <!-- Gastos Financieros -->
+        <tr class="expandable" onclick="toggleDetalle('gastos-financieros-detalle')">
+          <td>Gastos Financieros <span class="toggle-icon">▶</span></td>
+          <td id="gastos-financieros">0 €</td>
+        </tr>
+        <tr class="detalle" id="gastos-financieros-detalle">
+          <td colspan="2">
+            <ul id="detalle-financiero-lista"></ul>
+          </td>
+        </tr>
 
-                <!-- Impuestos (como categoría principal) -->
-                <tr class="expandable">
-                    <td>Impuestos (15%)</td>
-                    <td id="impuestos">0 €</td>
-                </tr>
+        <!-- BAI -->
+        <tr class="expandable">
+          <td>BAI (Beneficio Antes de Impuestos)</td>
+          <td id="bai">0 €</td>
+        </tr>
 
-                <!-- Resultado Neto (como categoría principal) -->
-                <tr class="expandable">
-                    <td>Resultado Neto</td>
-                    <td id="resultado-neto">0 €</td>
-                </tr>
-            </tbody>
-        </table>
+        <!-- Impuestos -->
+        <tr class="expandable">
+          <td>Impuestos (15%)</td>
+          <td id="impuestos">0 €</td>
+        </tr>
 
-        <!-- Botón Volver -->
-        <button class="volver-btn" onclick="window.location.href='../game.html'">Volver</button>
-    </div>
+        <!-- Resultado Neto -->
+        <tr class="expandable">
+          <td>Resultado Neto</td>
+          <td id="resultado-neto">0 €</td>
+        </tr>
+      </tbody>
+    </table>
 
-    <!-- Cargar la librería de Socket.io -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="proyeccion.js"></script>
+    <button id="volver-btn" class="volver-btn">Volver</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="proyeccion.js"></script>
 </body>
 </html>

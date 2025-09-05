@@ -1,116 +1,220 @@
+/* ===== FONDO Y CONTENEDOR (igual espíritu) ===== */
 body {
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(to right, #8e44ad, #3498db);
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    height: 100vh;
-    margin: 0;
-    padding: 20px;
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    text-align: center;
-    width: 90%;
-    max-width: 1200px;
-    height: auto;
-    overflow: auto;
+  width: 92%;
+  max-width: 1200px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 
+/* ===== TITULAR ===== */
 h1 {
-    color: #fff;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    margin-bottom: 30px;
-    text-transform: uppercase;
+  margin: 0 0 18px;
+  letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
+/* ===== GRID (mismo layout, celdas algo más anchas) ===== */
 .productos-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 30px;
-    margin-top: 20px;
-    padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
 }
 
+/* ===== TARJETA (más grande/legible) ===== */
 .producto {
-    background: #fff;
-    color: #333;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    text-align: left;
-    position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #ffffff;
+  color: #1a1f2c;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  will-change: transform;
 }
 
 .producto:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.16);
+  border-color: rgba(17,24,39,0.14);
 }
 
-.producto h3 {
-    font-size: 22px;
-    color: #2c3e50;
-    margin-bottom: 10px;
-    text-transform: uppercase;
+/* Cabecera con avatar y título */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.producto p {
-    margin-bottom: 15px;
-    color: #7f8c8d;
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 14px;
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.38);
+  user-select: none;
 }
 
-.producto ul {
-    list-style-type: none; /* Quitar los puntos de la lista */
-    padding: 0;
-    margin: 10px 0 0 0;
+.title h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+  color: #0f172a;
 }
 
-.producto li {
-    display: flex; /* Usar flex para alinear a izquierda y derecha */
-    justify-content: space-between;
-    background: #ecf0f1;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 5px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #34495e;
-    text-transform: uppercase; /* Poner en mayúsculas */
+.title p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 14px;
 }
 
-.producto li span {
-    flex: 1;
+/* ===== CUERPO CON ESPECIFICACIONES EN COLUMNA ===== */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.producto li span:first-child {
-    text-align: left;  /* Alinear la característica a la izquierda */
+.specs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
 }
 
-.producto li span:last-child {
-    text-align: right; /* Alinear el valor a la derecha */
+.spec-row {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  align-items: center;
+  gap: 10px;
 }
 
-/* Estilo para el botón "Volver" */
+.spec-key {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.spec-sep {
+  border-bottom: 1px dashed #e2e8f0;
+  height: 1px;
+}
+
+.spec-val {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Métrica (un poco más grande) */
+.metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.metric .label {
+  font-size: 13px;
+  color: #475569;
+}
+
+.metric .value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Acciones */
+.card-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Botones */
+.btn {
+  appearance: none;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, transform .05s ease;
+}
+
+.btn:hover { background: #f8fafc; }
+.btn:active { transform: translateY(1px); }
+
+.btn-danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+.btn-danger:hover { background: #dc2626; border-color:#dc2626; }
+
+.btn-ghost {
+  background: transparent;
+}
+
+/* Botón “Volver” (mismo look) */
 .btn-volver {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background-color: #3498db;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+  margin-top: 22px;
+  padding: 10px 16px;
+  background-color: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color .2s, transform .05s;
+}
+.btn-volver:hover { background-color: #2980b9; }
+.btn-volver:active { transform: translateY(1px); }
+
+/* Vacío */
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 28px;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 12px;
 }
 
-.btn-volver:hover {
-    background-color: #2980b9;
+/* Accesibilidad: menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  .producto { transition: none; }
+  .producto:hover { transform: none; }
 }

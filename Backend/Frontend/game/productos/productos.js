@@ -1,82 +1,113 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const socket = io();
-    const productosGrid = document.querySelector("#productos-lista");
+  const socket = io({ transports: ['websocket'], withCredentials: true, reconnection: true, reconnectionAttempts: 5, timeout: 20000 });;
 
-    const nombreEmpresa = localStorage.getItem("playerName");
+  // === Multisala (sin cambios funcionales) ===
+  const params = new URLSearchParams(location.search);
+  const partidaId  = params.get("partidaId")  || localStorage.getItem("partidaId")  || "default";
+  const playerName = localStorage.getItem("playerName") || params.get("playerName") || null;
 
-    // Verificar si el contenedor de productos existe
-    if (!productosGrid) {
-        console.error("No se encontró el contenedor de productos con el ID 'productos-lista'.");
-        return;
+  socket.emit("joinGame", { partidaId, nombre: playerName || null });
+  if (playerName) socket.emit("identificarJugador", playerName);
+
+  // DOM
+  const grid    = document.getElementById("productos-lista");
+  const backBtn = document.getElementById("back-button");
+
+  backBtn?.addEventListener("click", () => {
+    const url = new URL("../game.html", location.href);
+    url.searchParams.set("partidaId", partidaId);
+    if (playerName) url.searchParams.set("playerName", playerName);
+    location.href = url.pathname + "?" + url.searchParams.toString();
+  });
+
+  // Estado
+  let allProducts = [];
+
+  // Utils
+  const fmtMoney = (n) => (Number(n) || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  const initials = (nombre = "") => {
+    const parts = String(nombre).trim().split(/\s+/).slice(0, 2);
+    return parts.map(p => p[0]?.toUpperCase() || "").join("");
+  };
+
+  const specRow = (k, v) => `
+    <div class="spec-row">
+      <span class="spec-key">${k}</span>
+      <span class="spec-sep"></span>
+      <span class="spec-val">${v}</span>
+    </div>
+  `;
+
+  function render(products) {
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    if (!products.length) {
+      grid.innerHTML = `<div class="empty">No tienes productos en el portfolio todavía.</div>`;
+      return;
     }
 
-    // Cargar los productos y mostrar en la interfaz
-    function cargarProductos(productos) {
-        console.log("Productos a renderizar:", productos);
-        productosGrid.innerHTML = ''; // Limpiar lista actual
+    products.forEach((p) => {
+      const nombre = p?.nombre ?? "Producto";
+      const descripcion = p?.descripcion ?? "";
+      // ✅ Usamos SIEMPRE características base
+      const caracteristicas = p?.caracteristicas || {};
+      const coste = (p?.costeUnitarioEst != null) ? fmtMoney(p.costeUnitarioEst) : "—";
 
-        productos.forEach((producto, index) => {
-            const productoDiv = document.createElement("div");
-            productoDiv.classList.add("producto");
+      const specsHTML = Object.entries(caracteristicas).map(([k, v]) => specRow(k, v)).join("");
 
-            const nombreDiv = document.createElement("h3");
-            nombreDiv.textContent = producto.nombre;
+      const card = document.createElement("article");
+      card.className = "producto";
+      card.innerHTML = `
+        <div class="card-head">
+          <div class="avatar" aria-hidden="true">${initials(nombre) || "PR"}</div>
+          <div class="title">
+            <h3 title="${nombre}">${nombre}</h3>
+            <p title="${descripcion}">${descripcion || "Sin descripción"}</p>
+          </div>
+        </div>
 
-            const descripcionDiv = document.createElement("p");
-            descripcionDiv.textContent = producto.descripcion;
+        <div class="card-body">
+          <div class="specs" aria-label="Características">
+            ${specsHTML || '<div class="spec-row"><span class="spec-key">Características</span><span class="spec-sep"></span><span class="spec-val">Sin datos</span></div>'}
+          </div>
 
-            const caracteristicasDiv = document.createElement("ul");
-            for (const [caracteristica, valor] of Object.entries(producto.caracteristicas)) {
-                const li = document.createElement("li");
-                li.innerHTML = `<span>${caracteristica}:</span><span>${valor}</span>`;
-                caracteristicasDiv.appendChild(li);
-            }
+          <div class="metric" role="group" aria-label="Métricas">
+            <span class="label">Coste unitario estimado</span>
+            <span class="value">${coste}</span>
+          </div>
+        </div>
 
-            const costeUnitarioDiv = document.createElement("p");
-const costeUnitario = producto.costeUnitarioEst !== undefined ? producto.costeUnitarioEst : 'No disponible';
-costeUnitarioDiv.innerHTML = `<strong>Coste Unitario:</strong> ${costeUnitario} €`;
+        <div class="card-actions">
+          <button class="btn btn-danger" data-action="delete">Descatalogar</button>
+          <button class="btn btn-ghost"  data-action="details">Detalles</button>
+        </div>
+      `;
 
-            // Crear el botón para eliminar el producto (descatalogar)
-            const eliminarBtn = document.createElement("button");
-            eliminarBtn.textContent = "Descatalogar";
-            eliminarBtn.classList.add("eliminar-btn");
-            eliminarBtn.style.backgroundColor = "red";
-            eliminarBtn.style.color = "white";
+      // Acciones (sin cambios funcionales)
+      card.querySelector('[data-action="delete"]').addEventListener("click", () => {
+        if (!confirm(`¿Descatalogar "${nombre}"?`)) return;
+        socket.emit("eliminarProducto", { partidaId, playerName, producto: nombre });
+        allProducts = allProducts.filter(x => x?.nombre !== nombre); // optimista
+        render(allProducts);
+      });
 
-            // Añadir el evento de clic al botón para eliminar el producto
-            eliminarBtn.addEventListener("click", () => {
-                const confirmacion = confirm("¿Seguro que deseas descatalogar este producto?");
-                if (confirmacion) {
-                    // Emitir el evento al servidor para eliminar el producto
-                    socket.emit("eliminarProducto", { playerName: nombreEmpresa, producto: producto.nombre });
+      card.querySelector('[data-action="details"]').addEventListener("click", () => {
+        alert(
+`Nombre: ${nombre}
+Descripción: ${descripcion || "—"}
+Coste unitario: ${coste}`
+        );
+      });
 
-                    // Eliminar el producto del DOM localmente
-                    productoDiv.remove();
-                }
-            });
-
-            // Añadir los elementos creados al contenedor de productos
-            productoDiv.appendChild(nombreDiv);
-            productoDiv.appendChild(descripcionDiv);
-            productoDiv.appendChild(caracteristicasDiv);
-            productoDiv.appendChild(costeUnitarioDiv);  // Añadir el coste unitario al div del producto
-            productoDiv.appendChild(eliminarBtn); // Añadir el botón al div del producto
-
-            productosGrid.appendChild(productoDiv);  // Agregar el div del producto al contenedor
-        });
-    }
-
-    // Escuchar el evento para sincronizar los datos del jugador (incluyendo los productos)
-    socket.on("syncPlayerData", (data) => {
-        console.log("Datos recibidos del servidor:", data);  // Verificar los datos recibidos
-        
-        if (data.products && Array.isArray(data.products)) {
-            console.log("Productos sincronizados:", data.products);
-            cargarProductos(data.products);
-        } else {
-            console.error("La lista de productos es inválida o está vacía.");
-        }
+      grid.appendChild(card);
     });
-    // Emitir el evento para identificar al jugador
-    socket.emit("identificarJugador", nombreEmpresa);
+  }
+
+  // Datos entrantes (sin cambios)
+  socket.on("syncPlayerData", (data) => {
+    const products = Array.isArray(data?.products) ? data.products : [];
+    allProducts = products;
+    render(allProducts);
+  });
 });

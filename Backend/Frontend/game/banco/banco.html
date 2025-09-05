@@ -1,65 +1,62 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banco</title>
-    <link rel="stylesheet" href="banco.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco</title>
+  <link rel="stylesheet" href="banco.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Banco</h1>
-        <div class="loan-calculator">
-            <h2>Calculadora de Préstamos</h2>
-            <div id="budget">Presupuesto: <span id="budgetAmount" class="positive">130.000.000 €</span></div>
-            <div id="reserves">Reservas: <span id="reservesAmount" class="positive">50.000.000 €</span></div>
-            
-            <!-- Entrada de la cantidad del préstamo -->
-            <div class="input-group">
-                <label for="loan-amount">Cantidad del préstamo:</label>
-                <input type="number" id="loan-amount" placeholder="Introduce el monto del préstamo">
-                <span id="loan-amount-display"></span> <!-- Span para mostrar el valor formateado -->
-            </div>
+  <div class="container">
+    <h1>Banco</h1>
 
-            <div class="input-group">
-                <label for="loan-term">Plazo del préstamo (rondas):</label>
-                <input type="number" id="loan-term" placeholder="Introduce el plazo en rondas">
-            </div>
+    <div class="loan-calculator">
+      <h2>Calculadora de Préstamos</h2>
+      <div id="budget">Presupuesto: <span id="budgetAmount" class="positive">130.000.000 €</span></div>
+      <div id="reserves">Reservas: <span id="reservesAmount" class="positive">50.000.000 €</span></div>
 
-            <div class="results">
-                <p>Tasa de interés: <span id="interest-rate">0%</span></p>
-                <p>Amortización por ronda: <span id="amortization-per-round">0 €</span></p>
-                <p>Interés por ronda: <span id="interest-per-round">0 €</span></p>
-                <p>Total por ronda: <span id="total-per-round">0 €</span></p>
-            </div>
+      <div class="input-group">
+        <label for="loan-amount">Cantidad del préstamo:</label>
+        <input type="number" id="loan-amount" placeholder="Introduce el monto del préstamo">
+        <span id="loan-amount-display"></span>
+      </div>
 
-            <button id="request-loan-button">Solicitar Préstamo</button>
-        </div>
+      <div class="input-group">
+        <label for="loan-term">Plazo del préstamo (rondas):</label>
+        <input type="number" id="loan-term" placeholder="Introduce el plazo en rondas">
+      </div>
 
-        <div class="current-loans">
-            <h2>Préstamos Actuales</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Cantidad</th>
-                        <th>Interés</th>
-                        <th>Interés por Ronda</th>
-                        <th>Total por Ronda</th>
-                        <th>Rondas Restantes</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="loans-list">
-                    <!-- Lista de préstamos se llenará aquí -->
-                </tbody>
-            </table>
-        </div>
-        <!-- Botón Volver con el id asignado -->
-	<button id="back-button">Volver</button>
+      <div class="results">
+        <p>Tasa de interés: <span id="interest-rate">0%</span></p>
+        <p>Amortización por ronda: <span id="amortization-per-round">0 €</span></p>
+        <p>Interés por ronda: <span id="interest-per-round">0 €</span></p>
+        <p>Total por ronda: <span id="total-per-round">0 €</span></p>
+      </div>
 
+      <button id="request-loan-button">Solicitar Préstamo</button>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="banco.js"></script>
+    <div class="current-loans">
+      <h2>Préstamos Actuales</h2>
+      <table>
+        <thead>
+        <tr>
+          <th>Cantidad</th>
+          <th>Interés</th>
+          <th>Interés por Ronda</th>
+          <th>Total por Ronda</th>
+          <th>Rondas Restantes</th>
+          <th>Acciones</th>
+        </tr>
+        </thead>
+        <tbody id="loans-list"></tbody>
+      </table>
+    </div>
+
+    <button id="back-button">Volver</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="banco.js"></script>
 </body>
 </html>
