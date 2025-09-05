@@ -611,7 +611,7 @@ module.exports = (io, registry) => {
             console.log(`Eliminando datos del jugador ${playerName} por desconexión prolongada.`);
             delete partida.players[playerName];
           }
-        }, 180000);
+        }, 500000);
       }
     });
 
