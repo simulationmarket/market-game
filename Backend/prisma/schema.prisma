@@ -3,34 +3,32 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  // Ruta relativa al propio directorio /prisma
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Partida {
-  id          Int      @id @default(autoincrement())
-  codigo      String   @unique
+  id          String    @id @default(cuid())
+  codigo      String    @unique
   estado      String
-  rondaActual Int      @default(0)
-  createdAt   DateTime @default(now())
+  rondaActual Int       @default(0)
+  createdAt   DateTime  @default(now())
 
-  // Relaciones
-  jugadores  Jugador[]
-  rondas     Ronda[]
-  decisiones Decision[]
-  resultados ResultadoRonda[]
+  jugadores   Jugador[]
+  rondas      Ronda[]
+  decisiones  Decision[]
+  resultados  ResultadoRonda[]
 }
 
 model Jugador {
-  id        Int      @id @default(autoincrement())
+  id        String    @id @default(cuid())
   nombre    String
-  esBot     Boolean  @default(false)
-  budget    BigInt   @default(0)
-  createdAt DateTime @default(now())
+  esBot     Boolean   @default(false)
+  budget    BigInt    @default(0)
+  createdAt DateTime  @default(now())
 
-  partidaId Int
-  partida   Partida @relation(fields: [partidaId], references: [id], onDelete: Cascade)
+  partidaId String
+  partida   Partida   @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
   decisiones Decision[]
 
@@ -39,33 +37,33 @@ model Jugador {
 }
 
 model Ronda {
-  id        Int      @id @default(autoincrement())
-  numero    Int
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  numero     Int
+  createdAt  DateTime @default(now())
 
-  partidaId Int
-  partida   Partida @relation(fields: [partidaId], references: [id], onDelete: Cascade)
+  partidaId  String
+  partida    Partida  @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
-  decisiones Decision[]
-  resultado  ResultadoRonda? // 1:1 (opcional desde Ronda)
+  decisiones  Decision[]
+  resultado   ResultadoRonda?
 
   @@unique([partidaId, numero], name: "ronda_unica_por_partida")
   @@index([partidaId])
 }
 
 model Decision {
-  id        Int      @id @default(autoincrement())
-  data      Json
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  data       Json
+  createdAt  DateTime @default(now())
 
-  jugadorId Int
-  jugador   Jugador @relation(fields: [jugadorId], references: [id], onDelete: Cascade)
+  jugadorId  String
+  jugador    Jugador  @relation(fields: [jugadorId], references: [id], onDelete: Cascade)
 
-  partidaId Int
-  partida   Partida @relation(fields: [partidaId], references: [id], onDelete: Cascade)
+  partidaId  String
+  partida    Partida  @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
-  rondaId Int
-  ronda   Ronda @relation(fields: [rondaId], references: [id], onDelete: Cascade)
+  rondaId    String
+  ronda      Ronda    @relation(fields: [rondaId], references: [id], onDelete: Cascade)
 
   @@index([partidaId])
   @@index([rondaId])
@@ -73,15 +71,15 @@ model Decision {
 }
 
 model ResultadoRonda {
-  id        Int      @id @default(autoincrement())
-  data      Json
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  data       Json
+  createdAt  DateTime @default(now())
 
-  partidaId Int
-  partida   Partida @relation(fields: [partidaId], references: [id], onDelete: Cascade)
+  partidaId  String
+  partida    Partida  @relation(fields: [partidaId], references: [id], onDelete: Cascade)
 
-  rondaId Int   @unique // ← CLAVE: 1:1 necesita FK única
-  ronda   Ronda @relation(fields: [rondaId], references: [id], onDelete: Cascade)
+  rondaId    String
+  ronda      Ronda    @relation(fields: [rondaId], references: [id], onDelete: Cascade)
 
   @@unique([partidaId, rondaId], name: "resultado_unico_por_ronda")
   @@index([partidaId])
