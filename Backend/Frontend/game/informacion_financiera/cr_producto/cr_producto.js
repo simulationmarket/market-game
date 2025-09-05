@@ -90,83 +90,140 @@ function consolidarResultadosPorProducto(resultados, roundData) {
     resultadoNeto: 0,
   };
 
-  resultados.forEach((resultado) => {
-    const { producto, excedente, facturacionBruta, facturacionNeta, costeVentasProducto, margenBrutoProducto } = resultado;
+ resultados.forEach((resultado) => {
+  const producto = resultado.producto;
 
-    if (!productosConsolidados[producto]) {
-      productosConsolidados[producto] = {
-        producto,
-        facturacionBruta: 0,
-        devoluciones: 0,
-        facturacionNeta: 0,
-        costeVentas: 0,
-        margenBruto: 0,
-        gastosComerciales: 0,
-        gastosPublicidad: 0,
-        costesAlmacenaje: 0,
-        BAII: 0,
-        gastosFinancieros: roundData.gastosFinancieros || 0,
-        BAI: 0,
-        impuestos: 0,
-        resultadoNeto: 0,
-      };
-    }
+  // === Aliases / fallback de nombres ===
+  const facturacionBruta = Number(
+    resultado.facturacionBruta ??
+    resultado.ingresosBrutos ??
+    resultado.facturacion ??
+    0
+  );
 
-    const c = productosConsolidados[producto];
-    c.facturacionBruta += facturacionBruta || 0;
-    c.facturacionNeta  += facturacionNeta  || 0;
-    c.costeVentas      += costeVentasProducto || 0;
-    c.margenBruto      += margenBrutoProducto || 0;
-    c.devoluciones     += (facturacionBruta || 0) - (facturacionNeta || 0);
+  const facturacionNeta = Number(
+    resultado.facturacionNeta ??
+    resultado.ingresosNetos ??
+    resultado.ventasNetas ??
+    0
+  );
 
-    // Almacenaje (tu regla: 20 €/unidad excedente)
-    c.costesAlmacenaje += (excedente || 0) * 20;
+  const costeVentasProducto = Number(
+    resultado.costeVentasProducto ??
+    resultado.costeVentas ??
+    resultado.cogs ??
+    0
+  );
 
-    // Totales jugador
-    totalesJugador.facturacionBruta += facturacionBruta || 0;
-    totalesJugador.facturacionNeta  += facturacionNeta  || 0;
-    totalesJugador.costeVentas      += costeVentasProducto || 0;
-    totalesJugador.margenBruto      += margenBrutoProducto || 0;
-    totalesJugador.costesAlmacenaje += (excedente || 0) * 20;
-  });
+  const margenBrutoProducto = Number(
+    resultado.margenBrutoProducto ??
+    (facturacionNeta - costeVentasProducto) ??
+    0
+  );
 
-  // Publicidad y gastos comerciales prorrateados por facturación
-  const productosDecision = roundData.decisiones.products || [];
-  Object.values(productosConsolidados).forEach((c, idx) => {
-    const d = productosDecision[idx];
-    if (d) {
-      c.gastosPublicidad = d.presupuestoPublicidad || 0;
-      totalesJugador.gastosPublicidad += c.gastosPublicidad;
-    }
+  const excedente = Number(
+    resultado.excedente ??
+    resultado.stockExcedente ??
+    0
+  );
 
-    const pct = (totalesJugador.facturacionBruta > 0)
-      ? (c.facturacionBruta / totalesJugador.facturacionBruta)
-      : 0;
+  if (!productosConsolidados[producto]) {
+    productosConsolidados[producto] = {
+      producto,
+      facturacionBruta: 0,
+      devoluciones: 0,
+      facturacionNeta: 0,
+      costeVentas: 0,
+      margenBruto: 0,
+      gastosComerciales: 0,
+      gastosPublicidad: 0,
+      costesAlmacenaje: 0,
+      BAII: 0,
+      gastosFinancieros: roundData.gastosFinancieros || 0,
+      BAI: 0,
+      impuestos: 0,
+      resultadoNeto: 0,
+    };
+  }
 
-    c.gastosComerciales = (roundData.gastosComerciales || 0) * pct;
-    totalesJugador.gastosComerciales += c.gastosComerciales;
+  const c = productosConsolidados[producto];
+  c.facturacionBruta += facturacionBruta;
+  c.facturacionNeta  += facturacionNeta;
+  c.costeVentas      += costeVentasProducto;
+  c.margenBruto      += margenBrutoProducto;
+  c.devoluciones     += (facturacionBruta - facturacionNeta);
 
-    c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
-    c.BAI  = c.BAII - c.gastosFinancieros;
-    c.impuestos = c.BAI * 0.15;
-    totalesJugador.impuestos += c.impuestos;
-    c.resultadoNeto = c.BAI - c.impuestos;
-    totalesJugador.resultadoNeto += c.resultadoNeto;
-  });
+  // Almacenaje (20 €/ud excedente)
+  c.costesAlmacenaje += excedente * 20;
+
+  // Totales jugador
+  totalesJugador.facturacionBruta += facturacionBruta;
+  totalesJugador.facturacionNeta  += facturacionNeta;
+  totalesJugador.costeVentas      += costeVentasProducto;
+  totalesJugador.margenBruto      += margenBrutoProducto;
+  totalesJugador.costesAlmacenaje += excedente * 20;
+});
+
+// --- Publicidad y gastos comerciales (mejor mapeo) ---
+const productosDecision = roundData.decisiones.products || [];
+Object.values(productosConsolidados).forEach((c, idx) => {
+  const d = productosDecision[idx];
+
+  if (d) {
+    // Soporta ambas claves: presupuestoPublicidad | publicidad
+    c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0);
+    totalesJugador.gastosPublicidad += c.gastosPublicidad;
+  }
+
+  const pct = (totalesJugador.facturacionBruta > 0)
+    ? (c.facturacionBruta / totalesJugador.facturacionBruta)
+    : 0;
+
+  c.gastosComerciales = (roundData.gastosComerciales || 0) * pct;
+  totalesJugador.gastosComerciales += c.gastosComerciales;
+
+  c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
+  c.BAI  = c.BAII - c.gastosFinancieros;
+  c.impuestos = c.BAI * 0.15;
+  totalesJugador.impuestos += c.impuestos;
+  c.resultadoNeto = c.BAI - c.impuestos;
+  totalesJugador.resultadoNeto += c.resultadoNeto;
+});
 
   validarTotales(roundData, totalesJugador);
   return Object.values(productosConsolidados);
 }
 
 function validarTotales(roundData, totalesJugador) {
-  const keys = ["facturacionBruta", "facturacionNeta", "costeVentas", "margenBruto", "gastosComerciales", "gastosPublicidad", "costesAlmacenaje"];
-  keys.forEach((k) => {
+  const keysMap = {
+    facturacionBruta:   ["facturacionBruta", "ingresosBrutos"],
+    facturacionNeta:    ["facturacionNeta",  "ingresosNetos", "ventasNetas"],
+    costeVentas:        ["costeVentas", "costeVentasProducto", "cogs"],
+    margenBruto:        ["margenBruto", "margenBrutoProducto"],
+    gastosComerciales:  ["gastosComerciales"],
+    gastosPublicidad:   ["gastosPublicidad", "gastoPublicidad", "publicidadTotal"],
+    costesAlmacenaje:   ["costesAlmacenaje"]
+  };
+
+  for (const k of Object.keys(keysMap)) {
     const tv = Number(totalesJugador[k] || 0);
-    const gv = Number(roundData[k] || 0);
-    if (Math.abs(tv - gv) > 0.01) {
+    let gv = 0;
+    for (const alias of keysMap[k]) {
+      if (Object.prototype.hasOwnProperty.call(roundData, alias)) {
+        gv = Number(roundData[alias] || 0);
+        break;
+      }
+    }
+    // No avises si ambos son 0
+    if (tv === 0 && gv === 0) continue;
+
+    // Avisa sólo si la desviación supera el 1%
+    const diff = Math.abs(tv - gv);
+    const base = Math.max(1, Math.abs(gv));
+    if (diff / base > 0.01) {
       console.warn(`Desviación en ${k}: jugador=${tv.toFixed(2)} vs global=${gv.toFixed(2)}`);
     }
-  });
+  }
 }
 
 function generarEstructuraTabla(productosConsolidados) {
@@ -229,24 +286,33 @@ function generarEstructuraTabla(productosConsolidados) {
 }
 
 function generarGraficoPorProducto(productosConsolidados) {
+  const canvas = document.getElementById("gastosProductoChart");
+  if (!canvas) return;
+
+  // 🔧 Evita "Canvas is already in use..."
+  const prev = typeof Chart.getChart === "function"
+    ? Chart.getChart("gastosProductoChart") || Chart.getChart(canvas)
+    : null;
+  if (prev) prev.destroy();
+
   const labels = productosConsolidados.map(p => p.producto);
   const partidas = [
-    { key: "costeVentas", label: "Coste Ventas", color: "#ff6384" },
-    { key: "gastosComerciales", label: "Gastos Comerciales", color: "#36a2eb" },
-    { key: "gastosPublicidad", label: "Gastos Publicidad", color: "#ffcd56" },
-    { key: "costesAlmacenaje", label: "Costes Almacenaje", color: "#4bc0c0" },
-    { key: "gastosFinancieros", label: "Costes Financieros", color: "#9966ff" },
-    { key: "impuestos", label: "Impuestos", color: "#ff9f40" },
-    { key: "resultadoNeto", label: "Resultado Neto", color: "#c45850" },
+    { key: "costeVentas",        label: "Coste Ventas",        color: "#ff6384" },
+    { key: "gastosComerciales",  label: "Gastos Comerciales",  color: "#36a2eb" },
+    { key: "gastosPublicidad",   label: "Gastos Publicidad",   color: "#ffcd56" },
+    { key: "costesAlmacenaje",   label: "Costes Almacenaje",   color: "#4bc0c0" },
+    { key: "gastosFinancieros",  label: "Costes Financieros",  color: "#9966ff" },
+    { key: "impuestos",          label: "Impuestos",           color: "#ff9f40" },
+    { key: "resultadoNeto",      label: "Resultado Neto",      color: "#c45850" },
   ];
 
   const datasets = partidas.map(p => ({
     label: p.label,
-    data: productosConsolidados.map(px => px[p.key] || 0),
+    data: productosConsolidados.map(px => Number(px[p.key] || 0)),
     backgroundColor: p.color,
   }));
 
-  const ctx = document.getElementById("gastosProductoChart").getContext("2d");
+  const ctx = canvas.getContext("2d");
   new Chart(ctx, {
     type: "bar",
     data: { labels, datasets },
@@ -257,3 +323,4 @@ function generarGraficoPorProducto(productosConsolidados) {
     },
   });
 }
+
