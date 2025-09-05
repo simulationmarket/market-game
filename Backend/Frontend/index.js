@@ -4,11 +4,8 @@
 // const socket = io("https://tuapp.koyeb.app", {
 const socket = io('/', {
   path: '/socket.io',
-  transports: ['websocket', 'polling'], // prioriza WS, deja fallback
-  withCredentials: true,
-  reconnection: true,
-  reconnectionAttempts: 5,
-  timeout: 20000
+  transports: ['websocket'],
+  withCredentials: true
 });
 
 // logs útiles
