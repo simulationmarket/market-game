@@ -25,6 +25,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Asociar socket a jugador
   socket.emit('identificarJugador', playerName);
+  socket.emit('solicitarResultados',            { partidaId, playerName });
+  socket.emit('solicitarResultadosCompletos',   { partidaId, playerName });
 
   // ====== Navegación lateral ======
   const navButtons = document.querySelectorAll('.nav-button');
@@ -71,6 +73,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // roundsHistory para CR general y para contexto de las otras vistas
     const roundsHistory = data.roundsHistory || [];
     lastRoundsHistory = roundsHistory;
+    if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
+  socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+}
 
     sincronizarIframe(ifrCRGeneral, {
       type: 'SYNC',
