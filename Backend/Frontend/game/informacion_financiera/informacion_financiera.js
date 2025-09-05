@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', function () {
   const socket = io('/', {
-  path: '/socket.io',
-  transports: ['websocket', 'polling'],  // ✅ permite fallback
-  withCredentials: true,
-  reconnection: true,
-  reconnectionAttempts: 5,
-  timeout: 20000
-});
+    path: '/socket.io',
+    transports: ['websocket', 'polling'],  // permite fallback
+    withCredentials: true,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    timeout: 20000
+  });
 
   // === Multi-partida: partidaId + playerName ===
   const params = new URLSearchParams(location.search);
@@ -23,10 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  // Asociar socket a jugador
+  // Asociar socket a jugador + pedir datos al cargar
   socket.emit('identificarJugador', playerName);
-  socket.emit('solicitarResultados',            { partidaId, playerName });
-  socket.emit('solicitarResultadosCompletos',   { partidaId, playerName });
+  socket.emit('solicitarResultados',          { partidaId, playerName });
+  socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
 
   // ====== Navegación lateral ======
   const navButtons = document.querySelectorAll('.nav-button');
@@ -70,37 +70,41 @@ document.addEventListener('DOMContentLoaded', function () {
   let lastResultadosCompletos = [];
 
   socket.on('syncPlayerData', (data) => {
-  lastRoundsHistory = data.roundsHistory || [];
-  const payloadSync = { type: 'SYNC', playerName, roundsHistory: lastRoundsHistory };
+    lastRoundsHistory = data.roundsHistory || [];
 
-  ['iframeCrProducto','iframeVentas','iframeCuentaResultados'].forEach(id => {
-    document.getElementById(id)?.contentWindow?.postMessage(payloadSync, '*');
+    // Reenviar SYNC a todos
+    const payloadSync = { type: 'SYNC', playerName, roundsHistory: lastRoundsHistory };
+    sincronizarIframe(ifrCRProducto, payloadSync);
+    sincronizarIframe(ifrVentas,     payloadSync);
+    sincronizarIframe(ifrCRGeneral,  payloadSync);
+
+    // Si aún no tenemos resultados, vuelve a pedirlos
+    if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
+      socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+    }
   });
 
-  // Si aún no tenemos resultados, vuelve a pedirlos
-  if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
-    socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
-  }
-});
+  // Acepta payload como [] o como { resultados: [] }
+  socket.on('resultadosCompletos', (payload) => {
+    const arr = Array.isArray(payload)
+      ? payload
+      : (Array.isArray(payload?.resultados) ? payload.resultados : []);
 
+    lastResultadosCompletos = arr;
 
+    const msg = {
+      type: 'RESULTADOS_COMPLETOS',
+      playerName,
+      roundsHistory: lastRoundsHistory || [],
+      resultados: lastResultadosCompletos
+    };
 
-  socket.on('resultadosCompletos', ({ resultados }) => {
-  lastResultadosCompletos = Array.isArray(resultados) ? resultados : [];
-  const payload = {
-    type: 'RESULTADOS_COMPLETOS',
-    playerName,
-    roundsHistory: lastRoundsHistory || [],
-    resultados: lastResultadosCompletos
-  };
+    sincronizarIframe(ifrCRProducto, msg);
+    sincronizarIframe(ifrVentas,     msg);
+    sincronizarIframe(ifrCRGeneral,  msg);
 
-  ['iframeCrProducto','iframeVentas','iframeCuentaResultados'].forEach(id => {
-    document.getElementById(id)?.contentWindow?.postMessage(payload, '*');
+    console.log('[INF.FIN.] reenviados resultados:', lastResultadosCompletos.length);
   });
-
-  console.log('[INF.FIN.] reenviados resultados:', lastResultadosCompletos.length);
-});
-
 
   // Lógica de pestañas + disparo de solicitud de resultados completos
   navButtons.forEach((button) => {
@@ -112,13 +116,14 @@ document.addEventListener('DOMContentLoaded', function () {
       const targetId = button.getAttribute('data-target');
       document.getElementById(targetId)?.classList.add('active');
 
-      // Cuando se entra a CR Producto o Ventas, pedimos resultados completos
+      // Cuando se entra a CR Producto o Ventas, pedimos resultados completos (por si acaso)
       if (targetId === 'cuenta-productos' || targetId === 'ventas') {
-        socket.emit('solicitarResultadosCompletos');
+        socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
       }
     });
   });
 
   // Al cargar la vista, pide también resultados (por si entras directo)
-  socket.emit('solicitarResultados');
+  socket.emit('solicitarResultados',          { partidaId, playerName });
+  socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
 });

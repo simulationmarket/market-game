@@ -11,6 +11,11 @@ function formatearSegmento(seg) {
   const m = { altosIngresos: "Altos Ingresos", granConsumidor: "Gran Consumidor", innovadores: "Innovadores", profesionales: "Profesionales", bajosIngresos: "Bajos Ingresos" };
   return m[seg] || seg;
 }
+function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
+function _matchJugador(row, playerName){
+  const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
+  return _norm(candidato) === _norm(playerName);
+}
 
 const coloresSegmentos = {
   profesionales: 'rgba(54, 162, 235, 0.7)',
@@ -36,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const ventasJugador = resultados.filter(r => r.jugador === playerName);
+    const ventasJugador = resultados.filter(r => _matchJugador(r, playerName));
 
     // General
     mostrarTablaPorProductoYCanal(ventasJugador);
@@ -62,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       contenedor.appendChild(div);
 
-      const resultadosJugadorProducto = resultados.filter(r => r.jugador === playerName && r.producto === producto);
+      const resultadosJugadorProducto = resultados.filter(r => _matchJugador(r, playerName) && r.producto === producto);
       mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, `ventasSegmento-${producto}`);
       mostrarTablaCanal(resultadosJugadorProducto, `tablaCanal-${producto}`);
       mostrarCuotaPorSegmento(resultados, playerName, `cuotaSegmento-${producto}`, producto);
@@ -102,17 +107,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// === Render helpers (sin cambios de lógica respecto a tu base) ===
+// === Render helpers ===
 
 function mostrarTablaPorProductoYCanal(resultados) {
   const contenedor = document.getElementById("tabla-productos-canales");
   if (!contenedor) return;
 
   const agrupado = {};
-  resultados.forEach(({ canal, facturacionNeta, unidadesNetas }) => {
+  resultados.forEach(({ canal, facturacionNeta, unidadesNetas, unidadesVendidas }) => {
     if (!canal) return;
     if (!agrupado[canal]) agrupado[canal] = { canal, unidades: 0, ingresos: 0 };
-    agrupado[canal].unidades += Number(unidadesNetas) || 0;
+    const uds = Number(unidadesNetas ?? unidadesVendidas) || 0;
+    agrupado[canal].unidades += uds;
     agrupado[canal].ingresos += Number(facturacionNeta) || 0;
   });
 
@@ -178,7 +184,7 @@ function mostrarCuotaPorSegmento(resultados, playerName, idDiv, productoFiltrado
   resultados.forEach(({ segmento, jugador: nombre, unidadesVendidas, producto }) => {
     if (!segmento || isNaN(unidadesVendidas)) return;
     totales[segmento] = (totales[segmento] || 0) + Number(unidadesVendidas);
-    if (nombre === playerName && (!productoFiltrado || producto === productoFiltrado)) {
+    if (_matchJugador({ jugador: nombre }, playerName) && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[segmento] = (jugador[segmento] || 0) + Number(unidadesVendidas);
     }
   });
@@ -200,7 +206,7 @@ function mostrarCuotaPorCanal(resultados, playerName, idDiv, productoFiltrado = 
   resultados.forEach(({ canal, jugador: nombre, unidadesVendidas, producto }) => {
     if (!canal || isNaN(unidadesVendidas)) return;
     totales[canal] = (totales[canal] || 0) + Number(unidadesVendidas);
-    if (nombre === playerName && (!productoFiltrado || producto === productoFiltrado)) {
+    if (_matchJugador({ jugador: nombre }, playerName) && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[canal] = (jugador[canal] || 0) + Number(unidadesVendidas);
     }
   });
@@ -221,10 +227,11 @@ function mostrarTablaCanal(resultados, idDiv) {
   if (!contenedor) return;
 
   const agrupado = {};
-  resultados.forEach(({ canal, facturacionNeta, unidadesVendidas }) => {
+  resultados.forEach(({ canal, facturacionNeta, unidadesVendidas, unidadesNetas }) => {
     if (!canal) return;
     agrupado[canal] = agrupado[canal] || { unidades: 0, ingresos: 0 };
-    agrupado[canal].unidades += Number(unidadesVendidas) || 0;
+    const uds = Number(unidadesVendidas ?? unidadesNetas) || 0;
+    agrupado[canal].unidades += uds;
     agrupado[canal].ingresos += Number(facturacionNeta) || 0;
   });
 

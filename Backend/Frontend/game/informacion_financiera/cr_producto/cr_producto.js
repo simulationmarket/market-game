@@ -4,39 +4,37 @@ document.addEventListener('DOMContentLoaded', () => {
   let roundsHistory = [];
   let resultados = [];
 
-
   function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
-function _matchJugador(row, playerName){
-  const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
-  return _norm(candidato) === _norm(playerName);
-}
-
-// Telemetría: ver qué llega
-window.addEventListener('message', (e) => {
-  const d = e.data || {};
-  if (d.type === 'RESULTADOS_COMPLETOS' || d.type === 'SYNC') {
-    console.log(`[${location.pathname.split('/').pop()}] msg`, d.type, {
-      resultados: d.resultados?.length ?? 0,
-      roundsHistory: d.roundsHistory?.length ?? 0,
-      playerName: d.playerName
-    });
+  function _matchJugador(row, playerName){
+    const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
+    return _norm(candidato) === _norm(playerName);
   }
-});
 
-  // Render gate: solo renderiza cuando hay jugador + roundsHistory + resultados
+  // Telemetría (opcional)
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === 'RESULTADOS_COMPLETOS' || d.type === 'SYNC') {
+      console.log(`[${location.pathname.split('/').pop()}] msg`, d.type, {
+        resultados: d.resultados?.length ?? 0,
+        roundsHistory: d.roundsHistory?.length ?? 0,
+        playerName: d.playerName
+      });
+    }
+  });
+
+  // Render gate
   function tryRender() {
     if (!playerName || !Array.isArray(roundsHistory) || roundsHistory.length === 0 || !Array.isArray(resultados) || resultados.length === 0) {
       return;
     }
 
-    // Toma SIEMPRE la última ronda consolidada para mapear publicidad, costes financieros, etc.
+    // Última ronda consolidada
     const lastIndex = roundsHistory.length - 1;
     const roundData = roundsHistory[lastIndex];
 
     // Filtra resultados del jugador
     const resultadosJugador = resultados.filter(r => _matchJugador(r, playerName));
     if (resultadosJugador.length === 0) {
-      // Limpia o muestra vacío
       const cont = document.getElementById("tabla-contenedor");
       if (cont) cont.innerHTML = "<p>No hay resultados para mostrar todavía.</p>";
       const canvas = document.getElementById("gastosProductoChart");
@@ -58,7 +56,6 @@ window.addEventListener('message', (e) => {
     const { type } = data;
 
     if (!type) {
-      // Mensaje “antiguo”: venían todo junto
       const { playerName: pn, resultados: res, roundsHistory: rh } = data;
       if (pn) playerName = pn;
       if (Array.isArray(rh)) roundsHistory = rh;
@@ -71,7 +68,7 @@ window.addEventListener('message', (e) => {
       const { playerName: pn, roundsHistory: rh } = data;
       if (pn) playerName = pn;
       if (Array.isArray(rh)) roundsHistory = rh;
-      tryRender(); // aún puede faltar resultados, no pasa nada
+      tryRender();
       return;
     }
 
@@ -86,8 +83,7 @@ window.addEventListener('message', (e) => {
   });
 });
 
-
-/* ================== Lógica de consolidación/tabla/gráfico (tu base) ================== */
+/* ================== Lógica de consolidación/tabla/gráfico ================== */
 
 function consolidarResultadosPorProducto(resultados, roundData) {
   if (!roundData || !roundData.decisiones || !roundData.decisiones.products) {
@@ -109,105 +105,105 @@ function consolidarResultadosPorProducto(resultados, roundData) {
     resultadoNeto: 0,
   };
 
- resultados.forEach((resultado) => {
-  const producto = resultado.producto;
+  resultados.forEach((resultado) => {
+    const producto = resultado.producto;
 
-  // === Aliases / fallback de nombres ===
-  const facturacionBruta = Number(
-    resultado.facturacionBruta ??
-    resultado.ingresosBrutos ??
-    resultado.facturacion ??
-    0
-  );
+    // Aliases / fallback de nombres
+    const facturacionBruta = Number(
+      resultado.facturacionBruta ??
+      resultado.ingresosBrutos ??
+      resultado.facturacion ??
+      0
+    );
 
-  const facturacionNeta = Number(
-    resultado.facturacionNeta ??
-    resultado.ingresosNetos ??
-    resultado.ventasNetas ??
-    0
-  );
+    const facturacionNeta = Number(
+      resultado.facturacionNeta ??
+      resultado.ingresosNetos ??
+      resultado.ventasNetas ??
+      0
+    );
 
-  const costeVentasProducto = Number(
-    resultado.costeVentasProducto ??
-    resultado.costeVentas ??
-    resultado.cogs ??
-    0
-  );
+    const costeVentasProducto = Number(
+      resultado.costeVentasProducto ??
+      resultado.costeVentas ??
+      resultado.cogs ??
+      0
+    );
 
-  const margenBrutoProducto = Number(
-    resultado.margenBrutoProducto ??
-    (facturacionNeta - costeVentasProducto) ??
-    0
-  );
+    const margenBrutoProducto = Number(
+      resultado.margenBrutoProducto ??
+      (facturacionNeta - costeVentasProducto) ??
+      0
+    );
 
-  const excedente = Number(
-    resultado.excedente ??
-    resultado.stockExcedente ??
-    0
-  );
+    const excedente = Number(
+      resultado.excedente ??
+      resultado.stockExcedente ??
+      0
+    );
 
-  if (!productosConsolidados[producto]) {
-    productosConsolidados[producto] = {
-      producto,
-      facturacionBruta: 0,
-      devoluciones: 0,
-      facturacionNeta: 0,
-      costeVentas: 0,
-      margenBruto: 0,
-      gastosComerciales: 0,
-      gastosPublicidad: 0,
-      costesAlmacenaje: 0,
-      BAII: 0,
-      gastosFinancieros: roundData.gastosFinancieros || 0,
-      BAI: 0,
-      impuestos: 0,
-      resultadoNeto: 0,
-    };
-  }
+    if (!productosConsolidados[producto]) {
+      productosConsolidados[producto] = {
+        producto,
+        facturacionBruta: 0,
+        devoluciones: 0,
+        facturacionNeta: 0,
+        costeVentas: 0,
+        margenBruto: 0,
+        gastosComerciales: 0,
+        gastosPublicidad: 0,
+        costesAlmacenaje: 0,
+        BAII: 0,
+        gastosFinancieros: roundData.gastosFinancieros || 0,
+        BAI: 0,
+        impuestos: 0,
+        resultadoNeto: 0,
+      };
+    }
 
-  const c = productosConsolidados[producto];
-  c.facturacionBruta += facturacionBruta;
-  c.facturacionNeta  += facturacionNeta;
-  c.costeVentas      += costeVentasProducto;
-  c.margenBruto      += margenBrutoProducto;
-  c.devoluciones     += (facturacionBruta - facturacionNeta);
+    const c = productosConsolidados[producto];
+    c.facturacionBruta += facturacionBruta;
+    c.facturacionNeta  += facturacionNeta;
+    c.costeVentas      += costeVentasProducto;
+    c.margenBruto      += margenBrutoProducto;
+    c.devoluciones     += (facturacionBruta - facturacionNeta);
 
-  // Almacenaje (20 €/ud excedente)
-  c.costesAlmacenaje += excedente * 20;
+    // Almacenaje (20 €/ud excedente)
+    c.costesAlmacenaje += excedente * 20;
 
-  // Totales jugador
-  totalesJugador.facturacionBruta += facturacionBruta;
-  totalesJugador.facturacionNeta  += facturacionNeta;
-  totalesJugador.costeVentas      += costeVentasProducto;
-  totalesJugador.margenBruto      += margenBrutoProducto;
-  totalesJugador.costesAlmacenaje += excedente * 20;
-});
+    // Totales jugador
+    totalesJugador.facturacionBruta += facturacionBruta;
+    totalesJugador.facturacionNeta  += facturacionNeta;
+    totalesJugador.costeVentas      += costeVentasProducto;
+    totalesJugador.margenBruto      += margenBrutoProducto;
+    totalesJugador.costesAlmacenaje += excedente * 20;
+  });
 
-// --- Publicidad y gastos comerciales (mejor mapeo) ---
-const productosDecision = roundData.decisiones.products || [];
-Object.values(productosConsolidados).forEach((c, idx) => {
-  const d = productosDecision[idx];
+  // Publicidad y gastos comerciales (mejor mapeo)
+  const productosDecision = roundData.decisiones.products || [];
+  Object.values(productosConsolidados).forEach((c, idx) => {
+    const d = productosDecision[idx];
 
-  if (d) {
-    // Soporta ambas claves: presupuestoPublicidad | publicidad
-    c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0);
-    totalesJugador.gastosPublicidad += c.gastosPublicidad;
-  }
+    if (d) {
+      // Soporta ambas claves: presupuestoPublicidad | publicidad
+      c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0);
+      totalesJugador.gastosPublicidad += c.gastosPublicidad;
+    }
 
-  const pct = (totalesJugador.facturacionBruta > 0)
-    ? (c.facturacionBruta / totalesJugador.facturacionBruta)
-    : 0;
+    const pct = (totalesJugador.facturacionBruta > 0)
+      ? (c.facturacionBruta / totalesJugador.facturacionBruta)
+      : 0;
 
-  c.gastosComerciales = (roundData.gastosComerciales || 0) * pct;
-  totalesJugador.gastosComerciales += c.gastosComerciales;
+    c.gastosComerciales = (roundData.gastosComerciales || 0) * pct;
+    totalesJugador.gastosComerciales += c.gastosComerciales;
 
-  c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
-  c.BAI  = c.BAII - c.gastosFinancieros;
-  c.impuestos = c.BAI * 0.15;
-  totalesJugador.impuestos += c.impuestos;
-  c.resultadoNeto = c.BAI - c.impuestos;
-  totalesJugador.resultadoNeto += c.resultadoNeto;
-});
+    c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
+    c.BAI  = c.BAII - c.gastosFinancieros;
+    c.impuestos = c.BAI * 0.15;
+    totalesJugador.impuestos += c.impuestos;
+    c.resultadoNeto = c.BAI - c.impuestos;
+    totalesJugador.resultadoNeto += c.resultadoNeto;
+  });
 
   validarTotales(roundData, totalesJugador);
   return Object.values(productosConsolidados);
@@ -236,7 +232,7 @@ function validarTotales(roundData, totalesJugador) {
     // No avises si ambos son 0
     if (tv === 0 && gv === 0) continue;
 
-    // Avisa sólo si la desviación supera el 1%
+    // Avisa solo si la desviación supera el 1%
     const diff = Math.abs(tv - gv);
     const base = Math.max(1, Math.abs(gv));
     if (diff / base > 0.01) {
@@ -308,7 +304,7 @@ function generarGraficoPorProducto(productosConsolidados) {
   const canvas = document.getElementById("gastosProductoChart");
   if (!canvas) return;
 
-  // 🔧 Evita "Canvas is already in use..."
+  // Evita "Canvas is already in use..."
   const prev = typeof Chart.getChart === "function"
     ? Chart.getChart("gastosProductoChart") || Chart.getChart(canvas)
     : null;
@@ -342,4 +338,3 @@ function generarGraficoPorProducto(productosConsolidados) {
     },
   });
 }
-
