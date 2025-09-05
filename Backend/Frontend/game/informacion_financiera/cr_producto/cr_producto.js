@@ -5,10 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let resultados = [];
 
   function _norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
-  function _matchJugador(row, playerName){
-    const candidato = row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre;
-    return _norm(candidato) === _norm(playerName);
-  }
+function _matchJugador(row, playerName){
+  const c = _norm(row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre);
+  const p = _norm(playerName);
+  if (!c || !p) return false;
+  // exacto o “contiene” en ambos sentidos (útil si en resultados sale "PERLITA S.A." y tu nombre es "PERLITA")
+  return c === p || c.includes(p) || p.includes(c);
+}
 
   // Telemetría (opcional)
   window.addEventListener('message', (e) => {
@@ -32,18 +35,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastIndex = roundsHistory.length - 1;
     const roundData = roundsHistory[lastIndex];
 
-    // Filtra resultados del jugador
-    const resultadosJugador = resultados.filter(r => _matchJugador(r, playerName));
-    if (resultadosJugador.length === 0) {
-      const cont = document.getElementById("tabla-contenedor");
-      if (cont) cont.innerHTML = "<p>No hay resultados para mostrar todavía.</p>";
-      const canvas = document.getElementById("gastosProductoChart");
-      if (canvas && canvas.getContext) {
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      return;
-    }
+    // Conteo rápido para ver si el filtro está dejando todo a 0
+const resultadosJugador = resultados.filter(r => _matchJugador(r, playerName));
+console.log("[CR-PROD] filas totales:", resultados.length, "mías:", resultadosJugador.length, "player:", playerName);
+
+// Si sigue 0, imprime algunos candidatos de nombres que llegan
+if (resultadosJugador.length === 0) {
+  const candidatos = [...new Set(resultados.slice(0, 50).map(r => (r.jugador ?? r.empresa ?? "")))];
+  console.warn("[CR-PROD] ejemplos de 'jugador/empresa' en resultados:", candidatos.slice(0, 10));
+}
+
+
 
     const productosConsolidados = consolidarResultadosPorProducto(resultadosJugador, roundData);
     generarEstructuraTabla(productosConsolidados);
