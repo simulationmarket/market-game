@@ -1,101 +1,64 @@
+/* informacion_financiera.css — igual que Estudios */
+
 body {
-    margin: 0;
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(to right, #8e44ad, #3498db);
-    color: #fff;
-    display: flex;
-    height: 100vh;
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(to right, #8e44ad, #3498db);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden; /* sin scroll general */
 }
 
-.main-layout {
-    display: flex;
-    width: 100%;
-    height: 100%;
-}
-
+/* Sidebar fija a la izquierda */
 .sidebar {
-    width: 250px;
-    background-color: rgba(0, 0, 0, 0.8);
-    padding: 20px;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+  width: 200px;
+  background: rgba(0, 0, 0, 0.7);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
 }
 
-.sidebar h2 {
-    color: #fff;
-    margin-bottom: 20px;
+/* Botones como en Estudios */
+.sidebar-btn {
+  padding: 15px;
+  background-color: #3498db;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin: 0 10px;
+}
+.sidebar-btn:hover { background-color: #2980b9; }
+
+/* Contenedor principal a la derecha del sidebar */
+.main-content {
+  margin-left: 200px;
+  padding: 20px;
+  width: calc(100% - 200px);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* evita barras extra */
 }
 
-.sidebar ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-}
-
-.sidebar li {
-    margin-bottom: 10px;
-    width: 100%;
-}
-
-.nav-button {
-    width: 100%;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.nav-button.active {
-    background: #3498db;
-}
-
-.nav-button:hover {
-    background: rgba(52, 152, 219, 0.7);
-}
-.return-button {
-    width: 100%;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.return-button.active {
-    background: #3498db;
-}
-
-.return-button {
-    background: rgba(52, 152, 219, 0.7);
-}
-.content-container {
-    flex-grow: 1;
-    padding: 20px;
-    overflow: auto;
-}
-
-.content-section {
-    display: none;
-}
-
-.content-section.active {
-    display: block;
-}
-
+/* El iframe ocupa todo el alto disponible */
 iframe {
-    width: 100%;
-    height: calc(100vh - 80px); /* Ajusta según el contenido */
-    border: none;
-    border-radius: 10px;
-    background: #fff;
+  width: 100%;
+  height: 100%;
+  border: none;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  display: block;
 }
