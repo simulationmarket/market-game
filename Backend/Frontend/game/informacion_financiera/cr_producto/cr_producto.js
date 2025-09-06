@@ -6,22 +6,20 @@
     window.DISABLE_POLLING = true;
 
     const qs = new URLSearchParams(location.search);
-    const partidaId  = qs.get('partidaId')  || '';
-    const playerName = qs.get('playerName') || '';
-    const SOCKET_URL = qs.get('socketHost') || window.SOCKET_HOST || location.origin;
-    const LOG = '[CR-PROD]';
+    const partidaId  = qs.get('partidaId')  || localStorage.getItem('partidaId')  || '';
+    const playerName = qs.get('playerName') || localStorage.getItem('playerName') || '';
+    if (partidaId)  localStorage.setItem('partidaId', partidaId);
+    if (playerName) localStorage.setItem('playerName', playerName);
 
+    const LOG = '[CR-PROD]';
     if (!('io' in window)) { console.error(LOG, 'socket.io no cargado'); return; }
 
-    const socket = io(SOCKET_URL, {
+    const socket = io('/', {
       path: '/socket.io',
-      transports: ['websocket'],
-      upgrade: false,
+      transports: ['websocket', 'polling'],
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 5000,
       timeout: 20000
     });
 
@@ -36,13 +34,12 @@
       const p = _norm(playerName);
       return c === p || c.includes(p) || p.includes(c);
     };
-
     const maybeRender = () => { if (gotSync && gotRes) tryRender(); };
 
     socket.on('connect', () => {
-      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName, to: SOCKET_URL });
+      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
+      socket.emit('identificarJugador', playerName);
       socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
-      socket.emit('identificarJugador', { partidaId, playerName });
       socket.emit('solicitarResultados', { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
@@ -55,9 +52,63 @@
     }
 
     socket.on('syncPlayerData', handleSync);
-    socket.on('syncJugador', handleSync);
+    socket.on('syncJugador',    handleSync);
     socket.on('resultadosCompletos', handleResultados);
-    socket.on('resultadosCompletosIF', handleResultados);
+
+    function consolidarResultadosPorProducto(resultados, roundData) {
+      if (!roundData || !roundData.decisiones || !roundData.decisiones.products) return [];
+      const productosConsolidados = {};
+      const totalesJugador = {
+        facturacionBruta: 0, facturacionNeta: 0, costeVentas: 0, margenBruto: 0,
+        gastosComerciales: 0, gastosPublicidad: 0, costesAlmacenaje: 0,
+        gastosFinancieros: 0, impuestos: 0, resultadoNeto: 0
+      };
+
+      resultados.forEach((r) => {
+        const producto = r.producto;
+        const facturacionBruta    = Number(r.facturacionBruta ?? r.ingresosBrutos ?? r.facturacion ?? 0);
+        const facturacionNeta     = Number(r.facturacionNeta  ?? r.ingresosNetos  ?? r.ventasNetas ?? 0);
+        const costeVentasProducto = Number(r.costeVentasProducto ?? r.costeVentas ?? r.cogs ?? 0);
+        const margenBrutoProducto = Number(r.margenBrutoProducto ?? (facturacionNeta - costeVentasProducto) ?? 0);
+        const excedente           = Number(r.excedente ?? r.stockExcedente ?? 0);
+
+        if (!productosConsolidados[producto]) {
+          productosConsolidados[producto] = {
+            producto, facturacionBruta:0, devoluciones:0, facturacionNeta:0, costeVentas:0, margenBruto:0,
+            gastosComerciales:0, gastosPublicidad:0, costesAlmacenaje:0, BAII:0,
+            gastosFinancieros: roundData.gastosFinancieros || 0, BAI:0, impuestos:0, resultadoNeto:0
+          };
+        }
+
+        const c = productosConsolidados[producto];
+        c.facturacionBruta += facturacionBruta;
+        c.facturacionNeta  += facturacionNeta;
+        c.costeVentas      += costeVentasProducto;
+        c.margenBruto      += margenBrutoProducto;
+        c.devoluciones     += (facturacionBruta - facturacionNeta);
+        c.costesAlmacenaje += excedente * 20;
+
+        totalesJugador.facturacionBruta += facturacionBruta;
+        totalesJugador.facturacionNeta  += facturacionNeta;
+        totalesJugador.costeVentas      += costeVentasProducto;
+        totalesJugador.margenBruto      += margenBrutoProducto;
+        totalesJugador.costesAlmacenaje += excedente * 20;
+      });
+
+      const productosDecision = roundData.decisiones.products || [];
+      Object.values(productosConsolidados).forEach((c, idx) => {
+        const d = productosDecision[idx];
+        if (d) { c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0); totalesJugador.gastosPublicidad += c.gastosPublicidad; }
+        const pct = (totalesJugador.facturacionBruta > 0) ? (c.facturacionBruta / totalesJugador.facturacionBruta) : 0;
+        c.gastosComerciales = (roundData.gastosComerciales || 0) * pct; totalesJugador.gastosComerciales += c.gastosComerciales;
+        c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
+        c.BAI  = c.BAII - c.gastosFinancieros;
+        c.impuestos = c.BAI * 0.15; totalesJugador.impuestos += c.impuestos;
+        c.resultadoNeto = c.BAI - c.impuestos; totalesJugador.resultadoNeto += c.resultadoNeto;
+      });
+
+      return Object.values(productosConsolidados);
+    }
 
     function tryRender() {
       const last = roundsHistory[roundsHistory.length - 1];
@@ -78,62 +129,6 @@
       generarGraficoPorProducto(consol);
     }
   });
-
-  // ========= Consolidación / Tabla / Gráfico =========
-  function consolidarResultadosPorProducto(resultados, roundData) {
-    if (!roundData || !roundData.decisiones || !roundData.decisiones.products) return [];
-    const productosConsolidados = {};
-    const totalesJugador = {
-      facturacionBruta: 0, facturacionNeta: 0, costeVentas: 0, margenBruto: 0,
-      gastosComerciales: 0, gastosPublicidad: 0, costesAlmacenaje: 0,
-      gastosFinancieros: 0, impuestos: 0, resultadoNeto: 0
-    };
-
-    resultados.forEach((r) => {
-      const producto = r.producto;
-      const facturacionBruta    = Number(r.facturacionBruta ?? r.ingresosBrutos ?? r.facturacion ?? 0);
-      const facturacionNeta     = Number(r.facturacionNeta  ?? r.ingresosNetos  ?? r.ventasNetas ?? 0);
-      const costeVentasProducto = Number(r.costeVentasProducto ?? r.costeVentas ?? r.cogs ?? 0);
-      const margenBrutoProducto = Number(r.margenBrutoProducto ?? (facturacionNeta - costeVentasProducto) ?? 0);
-      const excedente           = Number(r.excedente ?? r.stockExcedente ?? 0);
-
-      if (!productosConsolidados[producto]) {
-        productosConsolidados[producto] = {
-          producto, facturacionBruta:0, devoluciones:0, facturacionNeta:0, costeVentas:0, margenBruto:0,
-          gastosComerciales:0, gastosPublicidad:0, costesAlmacenaje:0, BAII:0,
-          gastosFinancieros: roundData.gastosFinancieros || 0, BAI:0, impuestos:0, resultadoNeto:0
-        };
-      }
-
-      const c = productosConsolidados[producto];
-      c.facturacionBruta += facturacionBruta;
-      c.facturacionNeta  += facturacionNeta;
-      c.costeVentas      += costeVentasProducto;
-      c.margenBruto      += margenBrutoProducto;
-      c.devoluciones     += (facturacionBruta - facturacionNeta);
-      c.costesAlmacenaje += excedente * 20;
-
-      totalesJugador.facturacionBruta += facturacionBruta;
-      totalesJugador.facturacionNeta  += facturacionNeta;
-      totalesJugador.costeVentas      += costeVentasProducto;
-      totalesJugador.margenBruto      += margenBrutoProducto;
-      totalesJugador.costesAlmacenaje += excedente * 20;
-    });
-
-    const productosDecision = roundData.decisiones.products || [];
-    Object.values(productosConsolidados).forEach((c, idx) => {
-      const d = productosDecision[idx];
-      if (d) { c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0); totalesJugador.gastosPublicidad += c.gastosPublicidad; }
-      const pct = (totalesJugador.facturacionBruta > 0) ? (c.facturacionBruta / totalesJugador.facturacionBruta) : 0;
-      c.gastosComerciales = (roundData.gastosComerciales || 0) * pct; totalesJugador.gastosComerciales += c.gastosComerciales;
-      c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
-      c.BAI  = c.BAII - c.gastosFinancieros;
-      c.impuestos = c.BAI * 0.15; totalesJugador.impuestos += c.impuestos;
-      c.resultadoNeto = c.BAI - c.impuestos; totalesJugador.resultadoNeto += c.resultadoNeto;
-    });
-
-    return Object.values(productosConsolidados);
-  }
 
   function generarEstructuraTabla(productosConsolidados) {
     const cont = document.getElementById('tabla-contenedor');

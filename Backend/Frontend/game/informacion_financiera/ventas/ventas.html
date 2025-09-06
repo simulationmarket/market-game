@@ -3,13 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Informe de Ventas</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <link rel="stylesheet" href="ventas.css">
-
-  <!-- Portabilidad del backend: opcional, solo si quieres definirlo una vez global -->
-  <!-- <script>window.SOCKET_HOST = 'https://mi-backend.koyeb.app';</script> -->
-
-  <!-- Cliente Socket.IO (CDN) y Chart.js -->
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+  <!-- Igual que Productos: cliente Socket.IO del mismo origen -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Chart.js para los gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="ventas.js" defer></script>
 </head>
@@ -17,32 +15,32 @@
   <header><h1>Informe de Ventas</h1></header>
 
   <main>
-    <section>
+    <section id="ventas-por-producto">
       <h2>Ventas por Canal</h2>
       <div id="tabla-productos-canales"></div>
     </section>
 
-    <section>
+    <section id="ventas-por-segmento">
       <h2>Ventas por Segmento</h2>
       <canvas id="ventasSegmentoChart"></canvas>
     </section>
 
-    <section>
+    <section id="evolucion-ventas">
       <h2>Evolución de Ventas por Ronda</h2>
       <canvas id="evolucionVentasChart"></canvas>
     </section>
 
-    <section>
-      <h2>Cuota por Segmento</h2>
+    <section id="cuota-por-segmento">
+      <h2>Cuota de Mercado por Segmento</h2>
       <div id="tabla-cuota-segmento"></div>
     </section>
 
-    <section>
-      <h2>Cuota por Canal</h2>
+    <section id="cuota-por-canal">
+      <h2>Cuota de Mercado por Canal</h2>
       <div id="tabla-cuota-canal"></div>
     </section>
 
-    <section>
+    <section id="detalle-por-producto">
       <h2>Detalle por Producto</h2>
       <div id="contenedor-productos"></div>
     </section>

@@ -6,31 +6,29 @@
     window.DISABLE_POLLING = true;
 
     const qs = new URLSearchParams(location.search);
-    const partidaId  = qs.get('partidaId')  || '';
-    const playerName = qs.get('playerName') || '';
-    const SOCKET_URL = qs.get('socketHost') || window.SOCKET_HOST || location.origin;
-    const LOG = '[CR-GENERAL]';
+    const partidaId  = qs.get('partidaId')  || localStorage.getItem('partidaId')  || '';
+    const playerName = qs.get('playerName') || localStorage.getItem('playerName') || '';
+    if (partidaId)  localStorage.setItem('partidaId', partidaId);
+    if (playerName) localStorage.setItem('playerName', playerName);
 
+    const LOG = '[CR-GENERAL]';
     if (!('io' in window)) { console.error(LOG, 'socket.io no cargado'); return; }
 
-    const socket = io(SOCKET_URL, {
+    const socket = io('/', {
       path: '/socket.io',
-      transports: ['websocket'],
-      upgrade: false,
+      transports: ['websocket', 'polling'],
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 5000,
       timeout: 20000
     });
 
     let roundsHistory = [];
 
     socket.on('connect', () => {
-      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName, to: SOCKET_URL });
+      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
+      socket.emit('identificarJugador', playerName);
       socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
-      socket.emit('identificarJugador', { partidaId, playerName });
       socket.emit('solicitarResultados', { partidaId, playerName });
     });
     socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
@@ -42,7 +40,7 @@
       }
     }
     socket.on('syncPlayerData', handleSync);
-    socket.on('syncJugador', handleSync);
+    socket.on('syncJugador',    handleSync);
 
     function render() {
       if (!Array.isArray(roundsHistory) || roundsHistory.length === 0) return;

@@ -35,25 +35,22 @@
     window.DISABLE_POLLING = true;
 
     const qs = new URLSearchParams(location.search);
-    const partidaId  = qs.get('partidaId')  || '';
-    const playerName = qs.get('playerName') || '';
-    const SOCKET_URL = qs.get('socketHost') || window.SOCKET_HOST || location.origin;
+    const partidaId  = qs.get('partidaId')  || localStorage.getItem('partidaId')  || '';
+    const playerName = qs.get('playerName') || localStorage.getItem('playerName') || '';
+    if (partidaId)  localStorage.setItem('partidaId', partidaId);
+    if (playerName) localStorage.setItem('playerName', playerName);
+
     const LOG = '[VENTAS]';
 
-    if (!('io' in window)) {
-      console.error(LOG, 'socket.io no encontrado');
-      return;
-    }
+    if (!('io' in window)) { console.error(LOG, 'socket.io no encontrado'); return; }
 
-    const socket = io(SOCKET_URL, {
+    // === Igual que Productos: mismo origen, path /socket.io y se permite websocket+polling ===
+    const socket = io('/', {
       path: '/socket.io',
-      transports: ['websocket'],
-      upgrade: false,
+      transports: ['websocket', 'polling'],
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 5000,
       timeout: 20000
     });
 
@@ -65,9 +62,10 @@
     const maybeRender = () => { if (gotSync && gotRes) tryRender(); };
 
     socket.on('connect', () => {
-      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName, to: SOCKET_URL });
+      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
+      // Eventos típicos que usa tu backend
+      socket.emit('identificarJugador', playerName);              // como en Productos
       socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
-      socket.emit('identificarJugador', { partidaId, playerName });
       socket.emit('solicitarResultados', { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
@@ -85,9 +83,8 @@
     }
 
     socket.on('syncPlayerData', handleSync);
-    socket.on('syncJugador', handleSync);
+    socket.on('syncJugador',    handleSync);
     socket.on('resultadosCompletos', handleResultados);
-    socket.on('resultadosCompletosIF', handleResultados);
 
     function tryRender() {
       let ventasJugador = resultados.filter(r => _matchRowByPlayer(r, playerName));
