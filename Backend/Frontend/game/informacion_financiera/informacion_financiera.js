@@ -1,47 +1,66 @@
 'use strict';
 
-(function () {
-  // Esta vista no usa sockets
-  window.DISABLE_GLOBAL_SOCKET = true;
-  window.DISABLE_POLLING = true;
+document.addEventListener('DOMContentLoaded', function () {
+  // Abre un socket como en Estudios (opcional, solo identifica al jugador)
+  const socket = io();
 
+  // Lee params / guarda en localStorage como hace Productos
   const qs = new URLSearchParams(location.search);
   let partidaId  = qs.get('partidaId')  || localStorage.getItem('partidaId')  || '';
   let playerName = qs.get('playerName') || localStorage.getItem('playerName') || '';
 
-  // guarda por comodidad (igual que suele hacer Productos)
-  if (partidaId)  localStorage.setItem('partidaId', partidaId);
-  if (playerName) localStorage.setItem('playerName', playerName);
+  if (!playerName) {
+    alert('No se ha encontrado el nombre del jugador. Redirigiendo al inicio.');
+    window.location.href = '../game.html';
+    return;
+  }
 
-  function buildQuery(extra = {}) {
+  // Persistimos para que las subpantallas (dentro del iframe) lo lean si lo necesitan
+  localStorage.setItem('playerName', playerName);
+  if (partidaId) localStorage.setItem('partidaId', partidaId);
+
+  // Notificamos al backend (como en Estudios/Productos)
+  socket.emit('identificarJugador', playerName);
+
+  // Construye src del iframe con query (útil si las subpantallas leen por URL)
+  function buildQuery() {
     const sp = new URLSearchParams();
     if (partidaId)  sp.set('partidaId', partidaId);
     if (playerName) sp.set('playerName', playerName);
-    Object.entries(extra).forEach(([k, v]) => sp.set(k, v));
-    sp.set('v', Date.now().toString()); // cache-buster
+    sp.set('v', Date.now().toString()); // evita caché
     return '?' + sp.toString();
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const aCRG   = document.getElementById('link-cr-general');
-    const aCRP   = document.getElementById('link-cr-producto');
-    const aVENT  = document.getElementById('link-ventas');
-    const who    = document.getElementById('who');
-    const volver = document.getElementById('volver-btn');
+  const iframe = document.getElementById('iframe-content');
+  const btnCRG = document.getElementById('cr-general-btn');
+  const btnCRP = document.getElementById('cr-producto-btn');
+  const btnVEN = document.getElementById('ventas-btn');
+  const btnVolver = document.getElementById('volver-btn');
 
-    if (aCRG)  aCRG.href  = 'cuenta_resultados/cuenta_resultados.html' + buildQuery();
-    if (aCRP)  aCRP.href  = 'cr_producto/cr_producto.html'            + buildQuery();
-    if (aVENT) aVENT.href = 'ventas/ventas.html'                       + buildQuery();
+  // Carga por defecto CR General (encajada)
+  if (iframe) iframe.src = 'cuenta_resultados/cuenta_resultados.html' + buildQuery();
 
-    if (who) who.textContent = `Partida: ${partidaId || '(sin partida)'} — Jugador: ${playerName || '(sin nombre)'}`;
-
-    if (volver) {
-      volver.addEventListener('click', () => {
-        const url = new URL('../game.html', location.href);
-        if (partidaId)  url.searchParams.set('partidaId', partidaId);
-        if (playerName) url.searchParams.set('playerName', playerName);
-        location.href = url.pathname + '?' + url.searchParams.toString();
-      });
-    }
-  });
-})();
+  if (btnCRG) {
+    btnCRG.addEventListener('click', function () {
+      iframe.src = 'cuenta_resultados/cuenta_resultados.html' + buildQuery();
+    });
+  }
+  if (btnCRP) {
+    btnCRP.addEventListener('click', function () {
+      iframe.src = 'cr_producto/cr_producto.html' + buildQuery();
+    });
+  }
+  if (btnVEN) {
+    btnVEN.addEventListener('click', function () {
+      iframe.src = 'ventas/ventas.html' + buildQuery();
+    });
+  }
+  if (btnVolver) {
+    btnVolver.addEventListener('click', function () {
+      const url = new URL('../game.html', location.href);
+      if (partidaId)  url.searchParams.set('partidaId', partidaId);
+      if (playerName) url.searchParams.set('playerName', playerName);
+      window.location.href = url.pathname + '?' + url.searchParams.toString();
+    });
+  }
+});

@@ -4,26 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Información Financiera</title>
-  <link rel="stylesheet" href="informacion_financiera.css"/>
-  <script src="informacion_financiera.js" defer></script>
+  <link rel="stylesheet" href="informacion_financiera.css" />
 </head>
 <body>
-  <main class="layout">
-    <aside class="sidebar">
-      <h2>Información Financiera</h2>
-      <ul>
-        <li><a id="link-cr-general" class="nav" href="#">Cuenta de Resultados (General)</a></li>
-        <li><a id="link-cr-producto" class="nav" href="#">Cuenta de Resultados (Producto)</a></li>
-        <li><a id="link-ventas" class="nav" href="#">Ventas</a></li>
-      </ul>
-      <button id="volver-btn" class="return-button">Volver</button>
-    </aside>
+  <div class="sidebar">
+    <button id="cr-general-btn"  class="sidebar-btn">Cuenta de Resultados</button>
+    <button id="cr-producto-btn" class="sidebar-btn">CR por Producto</button>
+    <button id="ventas-btn"      class="sidebar-btn">Ventas</button>
+    <button id="volver-btn"      class="sidebar-btn">Volver</button>
+  </div>
 
-    <section class="content">
-      <h1>Panel</h1>
-      <p id="who"></p>
-      <p>Usa el menú para abrir cada subpantalla como página independiente (sin iframes).</p>
-    </section>
-  </main>
+  <div class="main-content">
+    <iframe id="iframe-content" src="cuenta_resultados/cuenta_resultados.html"></iframe>
+  </div>
+
+  <!-- Igual que en Estudios / Productos: cliente socket del mismo origen -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="informacion_financiera.js"></script>
 </body>
 </html>
