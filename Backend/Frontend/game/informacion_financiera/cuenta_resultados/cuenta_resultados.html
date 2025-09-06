@@ -1,32 +1,45 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuenta de Resultados</title>
-    <link rel="stylesheet" href="cuenta_resultados.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="cuenta_resultados.js" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta de Resultados</title>
+  <link rel="stylesheet" href="cuenta_resultados.css">
+
+  <!-- 1) Forzar dominio del BACKEND de sockets -->
+  <script>
+    window.SOCKET_URL_OVERRIDE = 'https://TU-BACKEND-SOCKETS.koyeb.app'; /* <- CAMBIA ESTO */
+    window.DISABLE_GLOBAL_SOCKET = true;
+    window.DISABLE_POLLING = true;
+  </script>
+
+  <!-- 2) Cliente Socket.IO desde CDN (en vez de /socket.io/socket.io.js) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+
+  <!-- 3) Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- 4) JS de la subpantalla -->
+  <script src="cuenta_resultados.js" defer></script>
 </head>
 <body>
-    <h1 id="main-title">Cuenta de Resultados</h1>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr id="header-row">
-                    <th>Partida</th>
-                    <!-- Columnas de rondas generadas dinámicamente -->
-                </tr>
-            </thead>
-            <tbody id="results-body">
-                <!-- Filas de resultados generadas dinámicamente -->
-            </tbody>
-        </table>
-    </div>
-    <h2>Gastos y Resultados por Ronda</h2>
-    <div class="chart-container">
-        <canvas id="gastosPorcentajeChart"></canvas>
-    </div>
+  <h1 id="main-title">Cuenta de Resultados</h1>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr id="header-row">
+          <th>Partida</th>
+          <!-- Columnas de rondas generadas dinámicamente -->
+        </tr>
+      </thead>
+      <tbody id="results-body">
+        <!-- Filas de resultados generadas dinámicamente -->
+      </tbody>
+    </table>
+  </div>
+  <h2>Gastos y Resultados por Ronda</h2>
+  <div class="chart-container">
+    <canvas id="gastosPorcentajeChart"></canvas>
+  </div>
 </body>
 </html>

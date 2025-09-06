@@ -1,24 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="cr_producto.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <title>Cuentas de Resultados por Producto</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuentas de Resultados por Producto</title>
+  <link rel="stylesheet" href="cr_producto.css">
+
+  <!-- 1) Forzar dominio del BACKEND de sockets -->
+  <script>
+    window.SOCKET_URL_OVERRIDE = 'https://TU-BACKEND-SOCKETS.koyeb.app'; /* <- CAMBIA ESTO */
+    window.DISABLE_GLOBAL_SOCKET = true;
+    window.DISABLE_POLLING = true;
+  </script>
+
+  <!-- 2) Cliente Socket.IO desde CDN -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+
+  <!-- 3) Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    
+  <div id="tabla-contenedor" class="product-tables">
+    <!-- Las tablas dinámicas se insertarán aquí -->
+  </div>
 
-    <div id="tabla-contenedor" class="product-tables">
-        <!-- Las tablas dinámicas se insertarán aquí -->
-    </div>
+  <h2>Gráfico de Gastos y Resultados por Producto</h2>
+  <div class="chart-container">
+    <canvas id="gastosProductoChart"></canvas>
+  </div>
 
-    <h2>Gráfico de Gastos y Resultados por Producto</h2>
-    <div class="chart-container">
-        <canvas id="gastosProductoChart"></canvas>
-    </div>
-
-    <script src="cr_producto.js"></script>
+  <!-- 4) Tu JS de la subpantalla -->
+  <script src="cr_producto.js"></script>
 </body>
 </html>
