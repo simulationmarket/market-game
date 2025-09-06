@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', function () {
   let roundsHistory = [];
 
   if (isIframe) {
+    // Pide sincronización al padre por si cargas después
+    try { window.parent?.postMessage({ type: 'NEED_SYNC' }, '*'); } catch {}
+
     window.addEventListener('message', (event) => {
       const data = event.data || {};
       const { type } = data;
@@ -35,13 +38,13 @@ document.addEventListener('DOMContentLoaded', function () {
   } else {
     // Fallback fuera de iframe (poco común en tu flujo)
     const socket = io('/', {
-  path: '/socket.io',
-  transports: ['websocket', 'polling'],  // ✅ permite fallback
-  withCredentials: true,
-  reconnection: true,
-  reconnectionAttempts: 5,
-  timeout: 20000
-});
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],  // ✅ permite fallback
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      timeout: 20000
+    });
     playerName = localStorage.getItem("playerName");
     if (!playerName) {
       alert("No se ha encontrado el nombre del jugador. Redirigiendo al inicio.");
@@ -82,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
     tableHeader.innerHTML = "<th>Partida</th>";
     tableBody.innerHTML = "";
 
-    // Encabezados: R1..Rn (en tu versión salía R0)
+    // Encabezados: R1..Rn
     roundsHistory.forEach((_, idx) => {
       const th = document.createElement("th");
       th.textContent = `R${idx + 1}`;
@@ -109,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const partidasImportantes = [
       "facturacionBruta", "facturacionNeta", "margenBruto", "gastosOperativos", "baii", "bai", "resultadoNeto",
     ];
-    const partidasSuma = ["facturacionBruta", "facturacionNeta", "margenBruto", "baii", "bai", "resultadoNeto"];
+    const partidasSuma  = ["facturacionBruta", "facturacionNeta", "margenBruto", "baii", "bai", "resultadoNeto"];
     const partidasResta = ["devoluciones","costeVentas","gastosPublicidad","gastosOperativos","gastosComerciales","costeAlmacenaje","gastosFinancieros","impuestos"];
 
     partidas.forEach(partida => {

@@ -95,6 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (isIframe) {
+    // Pide sincronización al padre por si cargamos después
+    try { window.parent?.postMessage({ type: 'NEED_SYNC' }, '*'); } catch {}
+
     window.addEventListener('message', (event) => {
       const data = event.data || {};
       const { type } = data;
@@ -108,8 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (type === 'SYNC') {
-        const { playerName: pn, roundsHistory: rh } = data;
+        const { playerName: pn, roundsHistory: rh, playerKeyNorm: pkn } = data;
         if (pn) playerName = pn;
+        if (pkn) playerKeyNorm = pkn;
         if (Array.isArray(rh)) roundsHistory = rh;
         tryRender();
         return;

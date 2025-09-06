@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return new Set(prods.map(_norm));
   }
 
+  // Pide sincronización al padre por si cargamos después
+  try { if (window.self !== window.top) window.parent?.postMessage({ type: 'NEED_SYNC' }, '*'); } catch {}
+
   // Telemetría mínima
   window.addEventListener('message', (e) => {
     const d = e.data || {};
@@ -80,8 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (type === 'SYNC') {
-      const { playerName: pn, roundsHistory: rh } = data;
+      const { playerName: pn, roundsHistory: rh, playerKeyNorm: pkn } = data;
       if (pn) playerName = pn;
+      if (pkn) playerKeyNorm = pkn;
       if (Array.isArray(rh)) roundsHistory = rh;
       tryRender();
       return;

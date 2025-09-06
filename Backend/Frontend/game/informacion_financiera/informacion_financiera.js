@@ -2,10 +2,10 @@
 
 // ================================================
 // Información financiera - cliente principal (hub)
-// - Carga subpantallas en iframes con parámetros
-// - Se identifica contra el backend vía socket.io
-// - Recibe roundsHistory y resultadosCompletos
-// - Reenvía datos a subpantallas vía window.postMessage
+// - Inyecta query params en iframes (partidaId/playerName)
+// - Socket.io forzado a WebSocket (evita 502 por polling)
+// - Recibe roundsHistory y resultadosCompletos del backend
+// - Reenvía a subpantallas vía postMessage (incluye playerKeyNorm)
 // ================================================
 
 (function () {
@@ -15,11 +15,14 @@
   const playerName = qs.get('playerName') || '';
   const LOG_PREFIX = '[INF FIN]';
 
-  // Referencias DOM (ajusta los IDs si tus iframes usan otros)
-  const ifrCRGeneral = document.getElementById('iframe-cr-general');
+  const normalizeKey = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const playerKeyNorm = normalizeKey(playerName);
+
+  // Referencias DOM (ajusta IDs si tus iframes usan otros)
+  const ifrCRGeneral  = document.getElementById('iframe-cr-general');
   const ifrCRProducto = document.getElementById('iframe-cr-producto');
-  const ifrVentas = document.getElementById('iframe-ventas');
-  const btnVolver = document.getElementById('volver-btn');
+  const ifrVentas     = document.getElementById('iframe-ventas');
+  const btnVolver     = document.getElementById('volver-btn');
 
   // Caches de datos
   let lastRoundsHistory = [];
@@ -28,22 +31,21 @@
   // ---------- Helper: construir src con query params ----------
   const withQuery = (path) => {
     const u = new URL(path, location.href);
-    if (partidaId) u.searchParams.set('partidaId', partidaId);
+    if (partidaId)  u.searchParams.set('partidaId', partidaId);
     if (playerName) u.searchParams.set('playerName', playerName);
     // cache-buster para despliegues en Koyeb/CDN
     u.searchParams.set('v', Date.now());
     return u.pathname + '?' + u.searchParams.toString();
   };
 
-  // Establece o refuerza el src de un iframe para que lleve los query params
+  // Asegura que un iframe tiene los params correctos
   function ensureIframeSrc(ifr, fallbackPath) {
     if (!ifr) return;
     try {
       const current = ifr.getAttribute('src');
       if (current) {
-        // Si ya tenía src, le añadimos los params (o los refrescamos)
         const u = new URL(current, location.href);
-        if (partidaId) u.searchParams.set('partidaId', partidaId);
+        if (partidaId)  u.searchParams.set('partidaId', partidaId);
         if (playerName) u.searchParams.set('playerName', playerName);
         u.searchParams.set('v', Date.now());
         ifr.src = u.pathname + '?' + u.searchParams.toString();
@@ -58,32 +60,48 @@
 
   // ---------- postMessage a subpantallas ----------
   function broadcast(type, payload) {
-    const message = { type, payload, playerName, partidaId };
+    const message = {
+      type,
+      payload,
+      playerName,
+      playerKeyNorm,
+      partidaId
+    };
     [ifrCRGeneral, ifrCRProducto, ifrVentas].forEach((ifr) => {
       if (ifr && ifr.contentWindow) {
-        try {
-          ifr.contentWindow.postMessage(message, '*');
-        } catch (e) {
-          console.warn(LOG_PREFIX, 'postMessage error', e);
-        }
+        try { ifr.contentWindow.postMessage(message, '*'); }
+        catch (e) { console.warn(LOG_PREFIX, 'postMessage error', e); }
       }
     });
   }
 
-  // ---------- Socket.io ----------
+  // ---------- Socket.io (forzado WebSocket) ----------
   let socket;
   if (!('io' in window)) {
-    console.error(LOG_PREFIX, 'socket.io no encontrado. Asegúrate de incluir <script src="/socket.io/socket.io.js"></script>');
+    console.error(LOG_PREFIX, 'socket.io no encontrado. Incluye <script src="/socket.io/socket.io.js"></script>');
   } else {
-    socket = io();
+    // Si el backend de sockets está en otro dominio, define window.SOCKET_URL_OVERRIDE = 'https://tu-backend.koyeb.app'
+    const SOCKET_URL = window.SOCKET_URL_OVERRIDE || location.origin;
+
+    socket = io(SOCKET_URL, {
+      path: '/socket.io',
+      transports: ['websocket'], // evita *polling* (502 en proxies)
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      withCredentials: true
+    });
 
     socket.on('connect', () => {
       console.log(LOG_PREFIX, 'conectado', { partidaId, playerName, sid: socket.id });
-      // Enviamos ambos campos por compatibilidad con distintos handlers
+      // Compatibilidad con distintos handlers
       socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
       socket.emit('identificarJugador', { partidaId, playerName });
+
       // Pedimos datos iniciales
-      socket.emit('solicitarResultados', { partidaId, playerName });
+      socket.emit('solicitarResultados',          { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
 
@@ -95,14 +113,14 @@
       console.error(LOG_PREFIX, 'connect_error:', err?.message || err);
     });
 
-    // ----- Handlers de sincronización (nombres alternativos por compatibilidad) -----
+    // ----- Handlers de sincronización -----
     function handleSync(data = {}) {
       try {
         const rh = Array.isArray(data.roundsHistory) ? data.roundsHistory : [];
         lastRoundsHistory = rh;
         console.log(LOG_PREFIX, `SYNC roundsHistory (${rh.length})`);
-        broadcast('SYNC', { roundsHistory: rh });
-        // Si aún no tenemos resultados completos, volvemos a pedirlos
+        // Enviamos roundsHistory también en RESULTADOS para que las subpantallas pinten con un solo mensaje
+        broadcast('SYNC', { roundsHistory: rh, playerKeyNorm });
         if (!Array.isArray(lastResultadosCompletos) || lastResultadosCompletos.length === 0) {
           socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
         }
@@ -118,15 +136,20 @@
         else if (Array.isArray(payload?.resultados)) arr = payload.resultados;
         lastResultadosCompletos = arr || [];
         console.log(LOG_PREFIX, `resultadosCompletos (${lastResultadosCompletos.length})`);
-        broadcast('RESULTADOS_COMPLETOS', { resultados: lastResultadosCompletos });
+        // Incluimos roundsHistory y playerKeyNorm para que las subpantallas no dependan del orden de llegada
+        broadcast('RESULTADOS_COMPLETOS', {
+          resultados: lastResultadosCompletos,
+          roundsHistory: lastRoundsHistory,
+          playerKeyNorm
+        });
       } catch (e) {
         console.error(LOG_PREFIX, 'handleResultadosCompletos error:', e);
       }
     }
 
     socket.on('syncPlayerData', handleSync);
-    socket.on('syncJugador', handleSync);
-    socket.on('resultadosCompletos', handleResultadosCompletos);
+    socket.on('syncJugador',    handleSync);
+    socket.on('resultadosCompletos',   handleResultadosCompletos);
     socket.on('resultadosCompletosIF', handleResultadosCompletos);
   }
 
@@ -135,11 +158,18 @@
     const data = ev?.data || {};
     const { type } = data;
     if (type === 'NEED_SYNC') {
-      if (lastRoundsHistory.length) broadcast('SYNC', { roundsHistory: lastRoundsHistory });
-      if (lastResultadosCompletos.length) broadcast('RESULTADOS_COMPLETOS', { resultados: lastResultadosCompletos });
-      // Por si el backend tiene datos más recientes
+      if (lastRoundsHistory.length) {
+        broadcast('SYNC', { roundsHistory: lastRoundsHistory, playerKeyNorm });
+      }
+      if (lastResultadosCompletos.length) {
+        broadcast('RESULTADOS_COMPLETOS', {
+          resultados: lastResultadosCompletos,
+          roundsHistory: lastRoundsHistory,
+          playerKeyNorm
+        });
+      }
       if (socket) {
-        socket.emit('solicitarResultados', { partidaId, playerName });
+        socket.emit('solicitarResultados',          { partidaId, playerName });
         socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
       }
     }
@@ -152,7 +182,6 @@
     const targetId = target.getAttribute('data-target');
     if (!targetId) return;
 
-    // Acciones al cambiar de subpantalla: refrescar datos y, si procede, pedir completos
     if (socket) {
       if (targetId === 'cuenta-productos' || targetId === 'ventas' || targetId.includes('producto')) {
         socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
@@ -160,9 +189,17 @@
       socket.emit('solicitarResultados', { partidaId, playerName });
     }
 
-    // Reenvío inmediato desde caché para que la subpantalla no quede en blanco
-    if (lastRoundsHistory.length) broadcast('SYNC', { roundsHistory: lastRoundsHistory });
-    if (lastResultadosCompletos.length) broadcast('RESULTADOS_COMPLETOS', { resultados: lastResultadosCompletos });
+    // Reenvío inmediato desde caché
+    if (lastRoundsHistory.length) {
+      broadcast('SYNC', { roundsHistory: lastRoundsHistory, playerKeyNorm });
+    }
+    if (lastResultadosCompletos.length) {
+      broadcast('RESULTADOS_COMPLETOS', {
+        resultados: lastResultadosCompletos,
+        roundsHistory: lastRoundsHistory,
+        playerKeyNorm
+      });
+    }
   });
 
   // ---------- Botón Volver (si existe) ----------
@@ -170,22 +207,20 @@
     btnVolver.addEventListener('click', () => {
       try {
         const url = new URL('../game.html', location.href);
-        if (partidaId) url.searchParams.set('partidaId', partidaId);
+        if (partidaId)  url.searchParams.set('partidaId', partidaId);
         if (playerName) url.searchParams.set('playerName', playerName);
         location.href = url.pathname + '?' + url.searchParams.toString();
       } catch (e) {
         console.error(LOG_PREFIX, 'navegación volver falló', e);
       }
     });
-
   }
 
   // ---------- Inicialización de iframes ----------
-  // OJO: ajusta los nombres si tus archivos reales difieren en mayúsculas/minúsculas
-  ensureIframeSrc(ifrCRGeneral, 'cr_general.html');
+  // ¡Asegura nombres/paths exactos (case-sensitive en Koyeb/Linux)!
+  ensureIframeSrc(ifrCRGeneral,  'cr_general.html');
   ensureIframeSrc(ifrCRProducto, 'cr_producto.html');
-  ensureIframeSrc(ifrVentas, 'ventas.html');
+  ensureIframeSrc(ifrVentas,     'ventas.html');
 
-  // ---------- Logs de arranque ----------
   console.log(LOG_PREFIX, 'inicializado', { partidaId, playerName });
 })();
