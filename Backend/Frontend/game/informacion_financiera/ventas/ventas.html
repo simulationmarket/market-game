@@ -5,64 +5,47 @@
   <title>Informe de Ventas</title>
   <link rel="stylesheet" href="ventas.css">
 
-  <!-- 1) Forzar dominio del BACKEND de sockets -->
-  <script>
-    window.SOCKET_URL_OVERRIDE = 'https://TU-BACKEND-SOCKETS.koyeb.app'; /* <- CAMBIA ESTO */
-    window.DISABLE_GLOBAL_SOCKET = true;
-    window.DISABLE_POLLING = true;
-  </script>
+  <!-- Portabilidad del backend: opcional, solo si quieres definirlo una vez global -->
+  <!-- <script>window.SOCKET_HOST = 'https://mi-backend.koyeb.app';</script> -->
 
-  <!-- 2) Cliente Socket.IO desde CDN -->
+  <!-- Cliente Socket.IO (CDN) y Chart.js -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
-
-  <!-- 3) Chart.js para los gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="ventas.js" defer></script>
 </head>
 <body>
-
-  <header>
-    <h1>Informe de Ventas</h1>
-  </header>
+  <header><h1>Informe de Ventas</h1></header>
 
   <main>
-    <!-- Sección: Ventas por producto y canal (General) -->
-    <section id="ventas-por-producto">
+    <section>
       <h2>Ventas por Canal</h2>
       <div id="tabla-productos-canales"></div>
     </section>
 
-    <!-- Sección: Ventas por segmento (General) -->
-    <section id="ventas-por-segmento">
+    <section>
       <h2>Ventas por Segmento</h2>
       <canvas id="ventasSegmentoChart"></canvas>
     </section>
 
-    <!-- Sección: Evolución de ventas (General) -->
-    <section id="evolucion-ventas">
+    <section>
       <h2>Evolución de Ventas por Ronda</h2>
       <canvas id="evolucionVentasChart"></canvas>
     </section>
 
-    <!-- Sección: Cuota por segmento (General) -->
-    <section id="cuota-por-segmento">
-      <h2>Cuota de Mercado por Segmento</h2>
+    <section>
+      <h2>Cuota por Segmento</h2>
       <div id="tabla-cuota-segmento"></div>
     </section>
 
-    <!-- Sección: Cuota por canal (General) -->
-    <section id="cuota-por-canal">
-      <h2>Cuota de Mercado por Canal</h2>
+    <section>
+      <h2>Cuota por Canal</h2>
       <div id="tabla-cuota-canal"></div>
     </section>
 
-    <!-- Secciones por producto -->
-    <section id="detalle-por-producto">
+    <section>
       <h2>Detalle por Producto</h2>
       <div id="contenedor-productos"></div>
     </section>
   </main>
-
-  <!-- 4) Tu JS de la subpantalla -->
-  <script src="ventas.js"></script>
 </body>
 </html>

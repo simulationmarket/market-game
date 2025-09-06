@@ -1,69 +1,48 @@
 'use strict';
 
 (function () {
-  // Evita que scripts globales (index.js, game.js, etc.) abran sockets en esta vista
+  // Evita sockets globales aquí
   window.DISABLE_GLOBAL_SOCKET = true;
   window.DISABLE_POLLING = true;
 
-  const LOG = '[INF FIN PADRE]';
-  const qs = new URLSearchParams(window.location.search);
-  const partidaId = qs.get('partidaId') || '';
+  const qs = new URLSearchParams(location.search);
+  const partidaId  = qs.get('partidaId')  || '';
   const playerName = qs.get('playerName') || '';
+  // Portabilidad del backend
+  const socketHost = qs.get('socketHost') || window.SOCKET_HOST || location.origin;
 
-  // IDs esperados en el HTML del padre
-  const ifrCRGeneral  = document.getElementById('iframe-cr-general');
-  const ifrCRProducto = document.getElementById('iframe-cr-producto');
-  const ifrVentas     = document.getElementById('iframe-ventas');
-  const btnVolver     = document.getElementById('volver-btn');
-
-  // Construye una URL con los query params necesarios + cache-buster
-  function withQuery(path) {
-    const u = new URL(path, window.location.href);
-    if (partidaId)  u.searchParams.set('partidaId', partidaId);
-    if (playerName) u.searchParams.set('playerName', playerName);
-    u.searchParams.set('v', Date.now().toString()); // evita caché en Koyeb/CDN
-    return u.pathname + '?' + u.searchParams.toString();
+  function q(params) {
+    const u = new URL(location.href);
+    const sp = new URLSearchParams();
+    if (partidaId)  sp.set('partidaId',  partidaId);
+    if (playerName) sp.set('playerName', playerName);
+    if (socketHost) sp.set('socketHost', socketHost);
+    if (params) Object.entries(params).forEach(([k,v]) => sp.set(k, v));
+    sp.set('v', Date.now().toString()); // cache-buster
+    return '?' + sp.toString();
   }
 
-  // Asegura que cada iframe tenga los params; si no tenía src, usa fallbackPath
-  function ensureIframeSrc(ifr, fallbackPath) {
-    if (!ifr) return;
-    try {
-      const current = ifr.getAttribute('src');
-      if (current && current.trim() !== '') {
-        const u = new URL(current, window.location.href);
-        if (partidaId)  u.searchParams.set('partidaId', partidaId);
-        if (playerName) u.searchParams.set('playerName', playerName);
-        u.searchParams.set('v', Date.now().toString());
-        ifr.src = u.pathname + '?' + u.searchParams.toString();
-      } else if (fallbackPath) {
-        ifr.src = withQuery(fallbackPath);
-      }
-    } catch (e) {
-      console.warn(LOG, 'ensureIframeSrc: fallback por error', e);
-      if (fallbackPath) ifr.src = withQuery(fallbackPath);
-    }
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const aCRG = document.getElementById('link-cr-general');
+    const aCRP = document.getElementById('link-cr-producto');
+    const aVEN = document.getElementById('link-ventas');
+    const who  = document.getElementById('who');
+    const volver = document.getElementById('volver-btn');
 
-  document.addEventListener('DOMContentLoaded', function () {
-    // ⚠️ Ajusta los nombres si tus archivos reales usan otro case (Linux/Koyeb es case-sensitive)
-    ensureIframeSrc(ifrCRGeneral,  'cr_general.html');
-    ensureIframeSrc(ifrCRProducto, 'cr_producto.html');
-    ensureIframeSrc(ifrVentas,     'ventas.html');
+    if (aCRG) aCRG.href = 'cuenta_resultados.html' + q();
+    if (aCRP) aCRP.href = 'cr_producto.html'      + q();
+    if (aVEN) aVEN.href = 'ventas.html'           + q();
 
-    if (btnVolver) {
-      btnVolver.addEventListener('click', function () {
-        try {
-          const url = new URL('../game.html', window.location.href);
-          if (partidaId)  url.searchParams.set('partidaId', partidaId);
-          if (playerName) url.searchParams.set('playerName', playerName);
-          window.location.href = url.pathname + '?' + url.searchParams.toString();
-        } catch (e) {
-          console.error(LOG, 'navegación volver falló', e);
-        }
+    if (who) who.textContent = `Partida: ${partidaId} — Jugador: ${playerName}`;
+
+    if (volver) {
+      volver.addEventListener('click', () => {
+        const url = new URL('game.html', location.href);
+        if (partidaId)  url.searchParams.set('partidaId', partidaId);
+        if (playerName) url.searchParams.set('playerName', playerName);
+        if (socketHost) url.searchParams.set('socketHost', socketHost);
+        location.href = url.pathname + '?' + url.searchParams.toString();
       });
     }
-
-    console.log(LOG, 'inicializado', { partidaId, playerName });
   });
 })();

@@ -2,21 +2,16 @@
 
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
-    // Evita sockets globales aquí
     window.DISABLE_GLOBAL_SOCKET = true;
     window.DISABLE_POLLING = true;
 
     const qs = new URLSearchParams(location.search);
-    const partidaId = qs.get('partidaId') || '';
+    const partidaId  = qs.get('partidaId')  || '';
     const playerName = qs.get('playerName') || '';
+    const SOCKET_URL = qs.get('socketHost') || window.SOCKET_HOST || location.origin;
     const LOG = '[CR-PROD]';
 
-    const SOCKET_URL = window.SOCKET_URL_OVERRIDE || location.origin;
-
-    if (!('io' in window)) {
-      console.error(LOG, 'socket.io no encontrado. Incluye <script src="/socket.io/socket.io.js"></script>');
-      return;
-    }
+    if (!('io' in window)) { console.error(LOG, 'socket.io no cargado'); return; }
 
     const socket = io(SOCKET_URL, {
       path: '/socket.io',
@@ -42,36 +37,21 @@
       return c === p || c.includes(p) || p.includes(c);
     };
 
-    function maybeRender() {
-      if (gotSync && gotRes) {
-        tryRender();
-      }
-    }
+    const maybeRender = () => { if (gotSync && gotRes) tryRender(); };
 
     socket.on('connect', () => {
-      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
+      console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName, to: SOCKET_URL });
       socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
       socket.emit('identificarJugador', { partidaId, playerName });
       socket.emit('solicitarResultados', { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
+    socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
-    socket.on('connect_error', (e) => console.error(LOG, 'connect_error', e?.message || e));
-
-    function handleSync(d = {}) {
-      roundsHistory = Array.isArray(d.roundsHistory) ? d.roundsHistory : [];
-      gotSync = true;
-      console.log(LOG, 'SYNC roundsHistory', roundsHistory.length);
-      maybeRender();
-    }
-
+    function handleSync(d = {}) { roundsHistory = Array.isArray(d.roundsHistory) ? d.roundsHistory : []; gotSync = true; maybeRender(); }
     function handleResultados(payload) {
-      resultados = Array.isArray(payload)
-        ? payload
-        : (Array.isArray(payload?.resultados) ? payload.resultados : []);
-      gotRes = true;
-      console.log(LOG, 'resultadosCompletos', resultados.length);
-      maybeRender();
+      resultados = Array.isArray(payload) ? payload : (Array.isArray(payload?.resultados) ? payload.resultados : []);
+      gotRes = true; maybeRender();
     }
 
     socket.on('syncPlayerData', handleSync);
@@ -83,109 +63,73 @@
       const last = roundsHistory[roundsHistory.length - 1];
       let filas = resultados.filter((r) => _matchRow(r));
       if (filas.length === 0) {
-        const mySet = new Set((last?.decisiones?.products || []).map((p) => _norm(p?.nombre)).filter(Boolean));
-        filas = resultados.filter((r) => mySet.has(_norm(r.producto)));
-        console.warn(LOG, 'fallback por producto →', filas.length, [...mySet]);
+        const mySet = new Set((last?.decisiones?.products || []).map(p => _norm(p?.nombre)).filter(Boolean));
+        filas = resultados.filter(r => mySet.has(_norm(r.producto)));
         if (filas.length === 0) {
           const cont = document.getElementById('tabla-contenedor');
           if (cont) cont.innerHTML = '<p>Sin filas para tu jugador/productos todavía.</p>';
           const canvas = document.getElementById('gastosProductoChart');
-          if (canvas?.getContext) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-          }
+          if (canvas?.getContext) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
           return;
         }
       }
-
       const consol = consolidarResultadosPorProducto(filas, last);
       generarEstructuraTabla(consol);
       generarGraficoPorProducto(consol);
     }
   });
 
-  // ================== Consolidación / Tabla / Gráfico ==================
+  // ========= Consolidación / Tabla / Gráfico =========
   function consolidarResultadosPorProducto(resultados, roundData) {
-    if (!roundData || !roundData.decisiones || !roundData.decisiones.products) {
-      console.error('Datos de la ronda o decisiones no proporcionados.');
-      return [];
-    }
-
+    if (!roundData || !roundData.decisiones || !roundData.decisiones.products) return [];
     const productosConsolidados = {};
     const totalesJugador = {
-      facturacionBruta: 0,
-      facturacionNeta: 0,
-      costeVentas: 0,
-      margenBruto: 0,
-      gastosComerciales: 0,
-      gastosPublicidad: 0,
-      costesAlmacenaje: 0,
-      gastosFinancieros: 0,
-      impuestos: 0,
-      resultadoNeto: 0
+      facturacionBruta: 0, facturacionNeta: 0, costeVentas: 0, margenBruto: 0,
+      gastosComerciales: 0, gastosPublicidad: 0, costesAlmacenaje: 0,
+      gastosFinancieros: 0, impuestos: 0, resultadoNeto: 0
     };
 
     resultados.forEach((r) => {
       const producto = r.producto;
-
-      const facturacionBruta = Number(r.facturacionBruta ?? r.ingresosBrutos ?? r.facturacion ?? 0);
-      const facturacionNeta = Number(r.facturacionNeta ?? r.ingresosNetos ?? r.ventasNetas ?? 0);
+      const facturacionBruta    = Number(r.facturacionBruta ?? r.ingresosBrutos ?? r.facturacion ?? 0);
+      const facturacionNeta     = Number(r.facturacionNeta  ?? r.ingresosNetos  ?? r.ventasNetas ?? 0);
       const costeVentasProducto = Number(r.costeVentasProducto ?? r.costeVentas ?? r.cogs ?? 0);
       const margenBrutoProducto = Number(r.margenBrutoProducto ?? (facturacionNeta - costeVentasProducto) ?? 0);
-      const excedente = Number(r.excedente ?? r.stockExcedente ?? 0);
+      const excedente           = Number(r.excedente ?? r.stockExcedente ?? 0);
 
       if (!productosConsolidados[producto]) {
         productosConsolidados[producto] = {
-          producto,
-          facturacionBruta: 0,
-          devoluciones: 0,
-          facturacionNeta: 0,
-          costeVentas: 0,
-          margenBruto: 0,
-          gastosComerciales: 0,
-          gastosPublicidad: 0,
-          costesAlmacenaje: 0,
-          BAII: 0,
-          gastosFinancieros: roundData.gastosFinancieros || 0,
-          BAI: 0,
-          impuestos: 0,
-          resultadoNeto: 0
+          producto, facturacionBruta:0, devoluciones:0, facturacionNeta:0, costeVentas:0, margenBruto:0,
+          gastosComerciales:0, gastosPublicidad:0, costesAlmacenaje:0, BAII:0,
+          gastosFinancieros: roundData.gastosFinancieros || 0, BAI:0, impuestos:0, resultadoNeto:0
         };
       }
 
       const c = productosConsolidados[producto];
       c.facturacionBruta += facturacionBruta;
-      c.facturacionNeta += facturacionNeta;
-      c.costeVentas += costeVentasProducto;
-      c.margenBruto += margenBrutoProducto;
-      c.devoluciones += (facturacionBruta - facturacionNeta);
+      c.facturacionNeta  += facturacionNeta;
+      c.costeVentas      += costeVentasProducto;
+      c.margenBruto      += margenBrutoProducto;
+      c.devoluciones     += (facturacionBruta - facturacionNeta);
       c.costesAlmacenaje += excedente * 20;
 
       totalesJugador.facturacionBruta += facturacionBruta;
-      totalesJugador.facturacionNeta += facturacionNeta;
-      totalesJugador.costeVentas += costeVentasProducto;
-      totalesJugador.margenBruto += margenBrutoProducto;
+      totalesJugador.facturacionNeta  += facturacionNeta;
+      totalesJugador.costeVentas      += costeVentasProducto;
+      totalesJugador.margenBruto      += margenBrutoProducto;
       totalesJugador.costesAlmacenaje += excedente * 20;
     });
 
     const productosDecision = roundData.decisiones.products || [];
     Object.values(productosConsolidados).forEach((c, idx) => {
       const d = productosDecision[idx];
-      if (d) {
-        c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0);
-        totalesJugador.gastosPublicidad += c.gastosPublicidad;
-      }
-
+      if (d) { c.gastosPublicidad = Number(d.presupuestoPublicidad ?? d.publicidad ?? 0); totalesJugador.gastosPublicidad += c.gastosPublicidad; }
       const pct = (totalesJugador.facturacionBruta > 0) ? (c.facturacionBruta / totalesJugador.facturacionBruta) : 0;
-      c.gastosComerciales = (roundData.gastosComerciales || 0) * pct;
-      totalesJugador.gastosComerciales += c.gastosComerciales;
-
+      c.gastosComerciales = (roundData.gastosComerciales || 0) * pct; totalesJugador.gastosComerciales += c.gastosComerciales;
       c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
-      c.BAI = c.BAII - c.gastosFinancieros;
-      c.impuestos = c.BAI * 0.15;
-      totalesJugador.impuestos += c.impuestos;
-      c.resultadoNeto = c.BAI - c.impuestos;
-      totalesJugador.resultadoNeto += c.resultadoNeto;
+      c.BAI  = c.BAII - c.gastosFinancieros;
+      c.impuestos = c.BAI * 0.15; totalesJugador.impuestos += c.impuestos;
+      c.resultadoNeto = c.BAI - c.impuestos; totalesJugador.resultadoNeto += c.resultadoNeto;
     });
 
     return Object.values(productosConsolidados);
@@ -193,8 +137,7 @@
 
   function generarEstructuraTabla(productosConsolidados) {
     const cont = document.getElementById('tabla-contenedor');
-    if (!cont) return;
-    cont.innerHTML = '';
+    if (!cont) return; cont.innerHTML = '';
 
     productosConsolidados.forEach((prod) => {
       const wrap = document.createElement('div');
@@ -205,7 +148,7 @@
       wrap.appendChild(title);
 
       const table = document.createElement('table');
-      table.classList.add('table', 'table-striped');
+      table.classList.add('table','table-striped');
 
       const thead = document.createElement('thead');
       thead.innerHTML = '<tr><th>Partida</th><th>Valor</th></tr>';
@@ -213,36 +156,31 @@
 
       const tbody = document.createElement('tbody');
       const partes = [
-        ['facturacionBruta', 'Facturación Bruta'],
-        ['devoluciones', 'Devoluciones'],
-        ['facturacionNeta', 'Facturación Neta'],
-        ['costeVentas', 'Coste Ventas'],
-        ['margenBruto', 'Margen Bruto'],
-        ['gastosComerciales', 'Gastos Comerciales'],
-        ['gastosPublicidad', 'Gastos de Publicidad'],
-        ['costesAlmacenaje', 'Costes de Almacenaje'],
-        ['BAII', 'BAII'],
-        ['gastosFinancieros', 'Costes Financieros'],
-        ['BAI', 'BAI'],
-        ['impuestos', 'Impuestos'],
-        ['resultadoNeto', 'Resultado Neto']
+        ['facturacionBruta','Facturación Bruta'],
+        ['devoluciones','Devoluciones'],
+        ['facturacionNeta','Facturación Neta'],
+        ['costeVentas','Coste Ventas'],
+        ['margenBruto','Margen Bruto'],
+        ['gastosComerciales','Gastos Comerciales'],
+        ['gastosPublicidad','Gastos de Publicidad'],
+        ['costesAlmacenaje','Costes de Almacenaje'],
+        ['BAII','BAII'],
+        ['gastosFinancieros','Costes Financieros'],
+        ['BAI','BAI'],
+        ['impuestos','Impuestos'],
+        ['resultadoNeto','Resultado Neto']
       ];
-      const negativas = new Set(['gastosComerciales', 'gastosPublicidad', 'costesAlmacenaje', 'gastosFinancieros', 'costeVentas', 'devoluciones', 'impuestos']);
+      const negativas = new Set(['gastosComerciales','gastosPublicidad','costesAlmacenaje','gastosFinancieros','costeVentas','devoluciones','impuestos']);
 
-      partes.forEach(([key, label]) => {
+      partes.forEach(([key,label]) => {
         const row = document.createElement('tr');
-        const c1 = document.createElement('td');
-        c1.textContent = label;
-
-        const c2 = document.createElement('td');
+        const c1  = document.createElement('td'); c1.textContent = label;
+        const c2  = document.createElement('td');
         const raw = Number(prod[key] || 0);
         const mostrado = negativas.has(key) ? -raw : raw;
-        c2.textContent = mostrado.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+        c2.textContent = mostrado.toLocaleString('es-ES', { style:'currency', currency:'EUR' });
         c2.style.color = mostrado >= 0 ? 'green' : 'red';
-
-        row.appendChild(c1);
-        row.appendChild(c2);
-        tbody.appendChild(row);
+        row.appendChild(c1); row.appendChild(c2); tbody.appendChild(row);
       });
 
       table.appendChild(tbody);
@@ -255,39 +193,31 @@
     const canvas = document.getElementById('gastosProductoChart');
     if (!canvas) return;
 
-    // Evitar "Canvas is already in use..."
-    const prev = (typeof Chart?.getChart === 'function')
-      ? (Chart.getChart('gastosProductoChart') || Chart.getChart(canvas))
-      : null;
+    const prev = typeof Chart?.getChart === 'function' ? (Chart.getChart('gastosProductoChart') || Chart.getChart(canvas)) : null;
     if (prev) prev.destroy();
 
-    const labels = productosConsolidados.map((p) => p.producto);
+    const labels = productosConsolidados.map(p => p.producto);
     const partidas = [
-      { key: 'costeVentas', label: 'Coste Ventas', color: '#ff6384' },
-      { key: 'gastosComerciales', label: 'Gastos Comerciales', color: '#36a2eb' },
-      { key: 'gastosPublicidad', label: 'Gastos Publicidad', color: '#ffcd56' },
-      { key: 'costesAlmacenaje', label: 'Costes Almacenaje', color: '#4bc0c0' },
-      { key: 'gastosFinancieros', label: 'Costes Financieros', color: '#9966ff' },
-      { key: 'impuestos', label: 'Impuestos', color: '#ff9f40' },
-      { key: 'resultadoNeto', label: 'Resultado Neto', color: '#c45850' }
+      { key:'costeVentas',       label:'Coste Ventas',        color:'#ff6384' },
+      { key:'gastosComerciales', label:'Gastos Comerciales',  color:'#36a2eb' },
+      { key:'gastosPublicidad',  label:'Gastos Publicidad',   color:'#ffcd56' },
+      { key:'costesAlmacenaje',  label:'Costes Almacenaje',   color:'#4bc0c0' },
+      { key:'gastosFinancieros', label:'Costes Financieros',  color:'#9966ff' },
+      { key:'impuestos',         label:'Impuestos',           color:'#ff9f40' },
+      { key:'resultadoNeto',     label:'Resultado Neto',      color:'#c45850' }
     ];
 
-    const datasets = partidas.map((p) => ({
+    const datasets = partidas.map(p => ({
       label: p.label,
-      data: productosConsolidados.map((px) => Number(px[p.key] || 0)),
+      data: productosConsolidados.map(px => Number(px[p.key] || 0)),
       backgroundColor: p.color
     }));
 
     const ctx = canvas.getContext('2d');
-    // eslint-disable-next-line no-new
     new Chart(ctx, {
       type: 'bar',
       data: { labels, datasets },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'top' } },
-        scales: { x: { stacked: true }, y: { stacked: true } }
-      }
+      options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
     });
   }
 })();

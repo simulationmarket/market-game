@@ -5,61 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Información Financiera</title>
   <link rel="stylesheet" href="informacion_financiera.css" />
-  <!-- ⚠️ El padre no usa sockets: no cargamos /socket.io/socket.io.js -->
   <script src="informacion_financiera.js" defer></script>
 </head>
 <body>
-  <div class="main-layout">
-    <div class="sidebar">
+  <main class="layout">
+    <aside class="sidebar">
       <h2>Información Financiera</h2>
       <ul>
-        <li><button class="nav-button active" data-target="cuenta-general">Cuenta de Resultados</button></li>
-        <li><button class="nav-button" data-target="cuenta-productos">C.R. Producto</button></li>
-        <li><button class="nav-button" data-target="ventas">Ventas</button></li>
-        <li><button id="volver-btn" class="return-button">Volver</button></li>
+        <li><a id="link-cr-general" class="nav">Cuenta de Resultados (General)</a></li>
+        <li><a id="link-cr-producto" class="nav">Cuenta de Resultados (Producto)</a></li>
+        <li><a id="link-ventas" class="nav">Ventas</a></li>
       </ul>
-    </div>
+      <button id="volver-btn">Volver</button>
+    </aside>
 
-    <div class="content-container">
-      <!-- Cuenta de Resultados GENERAL -->
-      <div id="cuenta-general" class="content-section active">
-        <h1>Cuenta de Resultados General</h1>
-        <iframe
-          id="iframe-cr-general"
-          src="cuenta_resultados/cuenta_resultados.html"
-          frameborder="0"
-          width="100%"
-          height="100%"
-          style="border:none;"
-        ></iframe>
-      </div>
-
-      <!-- Cuenta de Resultados POR PRODUCTO -->
-      <div id="cuenta-productos" class="content-section">
-        <h1>Cuenta de Resultados por Producto</h1>
-        <iframe
-          id="iframe-cr-producto"
-          src="cr_producto/cr_producto.html"
-          frameborder="0"
-          width="100%"
-          height="100%"
-          style="border:none;"
-        ></iframe>
-      </div>
-
-      <!-- Ventas -->
-      <div id="ventas" class="content-section">
-        <h1>Ventas</h1>
-        <iframe
-          id="iframe-ventas"
-          src="ventas/ventas.html"
-          frameborder="0"
-          width="100%"
-          height="100%"
-          style="border:none;"
-        ></iframe>
-      </div>
-    </div>
-  </div>
+    <section class="content">
+      <h1>Panel</h1>
+      <p id="who"></p>
+      <p>Usa el menú para abrir cada subpantalla como página independiente (sin iframes).</p>
+    </section>
+  </main>
 </body>
 </html>
