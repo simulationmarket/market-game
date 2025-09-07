@@ -42,6 +42,16 @@
     socket.on('syncPlayerData', handleSync);
     socket.on('syncJugador',    handleSync);
 
+    socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+
+socket.on('resultadosCompletos', (payload) => {
+  console.log('[CR-GENERAL] resultadosCompletos', payload);
+  if (payload?.roundsHistory) {
+    roundsHistory = payload.roundsHistory;
+    render();
+  }
+});
+
     function render() {
       if (!Array.isArray(roundsHistory) || roundsHistory.length === 0) return;
       generarEstructuraTabla(roundsHistory);
