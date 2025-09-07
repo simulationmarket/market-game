@@ -27,9 +27,11 @@
 
     socket.on('connect', () => {
       console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
-      socket.emit('identificarJugador', playerName);
-      socket.emit('joinGame', { partidaId, playerName, nombre: playerName });
+      // ✅ así SÍ (igual que Productos/Estudios)
+      socket.emit('joinGame', { partidaId, nombre: playerName }); // usa 'nombre'
+      socket.emit('identificarJugador', playerName);               // envía STRING
       socket.emit('solicitarResultados', { partidaId, playerName });
+      socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
     socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
