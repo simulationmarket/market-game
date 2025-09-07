@@ -6,7 +6,7 @@ let totalPlayersConnected = 0;
 const { actualizarMercado } = require('./market.js');
 const { iniciarCalculos, eventEmitter } = require('../utils/calculos');
 const { tomarDecisionesBot } = require('../utils/bots');
-
+const { generarResultados } = require('../utils/resultadosJugadores');
 const TIEMPO_ESPERA_INSCRIPCION = 5000; // ms
 const MAX_ROUNDS = 10;
 
@@ -14,15 +14,15 @@ const MAX_ROUNDS = 10;
 
 function getPartidaState(registry, partidaId) {
   const partida = registry.getOrCreatePartida(partidaId);
-  // Inicializa estructuras si no existen aún (objetos planos por compat)
-  partida.players ||= {};                // { [nombre]: PlayerState }
-  partida.marketData ||= {};             // se inicializa en market.js al pedirse
-  partida.socketsToPlayers ||= {};       // { [socketId]: nombre }
-  partida.resultadosCache ||= null;
+  partida.players ||= {};
+  partida.marketData ||= {};
+  partida.socketsToPlayers ||= {};
+  partida.resultadosCache ||= null;              // (puedes mantenerlo para compat vieja)
+  partida.resultadosRawCache ||= null;           // ★ NUEVO: crudos (resultadosFinales)
   partida.estadosCache ||= null;
-  partida.resultadosCompletosCache ||= null;
+  partida.resultadosCompletosCache ||= null;     // procesados (para CR Producto)
   partida.inscripcionCerrada ||= false;
-  partida.inscripcionTemporizador ||= null; // flag para bloquear doble inicio
+  partida.inscripcionTemporizador ||= null;
   partida.gamePhase ||= 'lobby';
   return partida;
 }
@@ -171,11 +171,11 @@ module.exports = (io, registry) => {
 
     /* ---- 2) Resultados: generales, completos y estados ---- */
     socket.on('solicitarResultados', () => {
-      const partidaId = socket.data.partidaId || 'default';
-      const partida = getPartidaState(registry, partidaId);
-      console.log(`Cliente solicitó resultados generales [${partidaId}]:`, socket.id);
-      socket.emit('resultadosFinales', partida.resultadosCache || []);
-    });
+  const partidaId = socket.data.partidaId || 'default';
+  const partida = getPartidaState(registry, partidaId);
+  console.log(`Cliente solicitó resultados generales [${partidaId}]:`, socket.id);
+  socket.emit('resultadosFinales', partida.resultadosRawCache || []);
+});
 
     socket.on('solicitarEstadosJugadores', () => {
       const partidaId = socket.data.partidaId || 'default';
@@ -452,16 +452,45 @@ module.exports = (io, registry) => {
 
           console.log("Resultados procesados. Actualizando y notificando...");
 
-          const partida = getPartidaState(registry, partidaId);
-          partida.resultadosCache = Array.isArray(resultadosFinales) ? resultadosFinales : [];
-          partida.resultadosCompletosCache = partida.resultadosCache;
-          partida.estadosCache = Object.entries(partida.players).map(([playerName, p]) => ({
-            playerName,
-            ...p.gameState,
-          }));
+const partida = getPartidaState(registry, partidaId);
 
-          io.to(room).emit('resultadosFinales', partida.resultadosCache);
-          io.to(room).emit('resultadosCompletos', partida.resultadosCompletosCache);
+// 1) Guardamos SIEMPRE los crudos por compatibilidad
+partida.resultadosRawCache = Array.isArray(resultadosFinales) ? resultadosFinales : [];
+
+// 2) Generamos los PROCESADOS (contables) que consumen las pantallas
+let resultadosProcesados = [];
+try {
+  resultadosProcesados = generarResultados(
+    JSON.parse(JSON.stringify(partida.players)),  // playersData
+    partida.marketData,                           // marketData
+    partida.resultadosRawCache,                   // resultadosFinales (crudos)
+    { partidaId }                                 // meta opcional
+  ) || [];
+} catch (e) {
+  console.error('Error en generarResultados:', e);
+  resultadosProcesados = [];
+}
+
+// 3) Cache que servirán las pantallas “completas”
+partida.resultadosCompletosCache = resultadosProcesados;
+
+// (opcional) mantén resultadosCache apuntando a los procesados para compat vieja
+partida.resultadosCache = resultadosProcesados;
+
+// 4) Estados de jugadores (igual que antes)
+partida.estadosCache = Object.entries(partida.players).map(([playerName, p]) => ({
+  playerName,
+  ...p.gameState,
+}));
+
+// 5) Emitimos ambos canales: generales (raw) y completos (procesados)
+io.to(room).emit('resultadosFinales', partida.resultadosRawCache);
+io.to(room).emit('resultadosCompletos', partida.resultadosCompletosCache);
+
+// Diagnóstico útil (ver primera fila procesada)
+if (partida.resultadosCompletosCache?.length) {
+  console.log('Fila ejemplo resultadosCompletosCache:', partida.resultadosCompletosCache[0]);
+}
 
           Object.keys(processedPlayersData).forEach(nombre => {
             const player = partida.players[nombre];
