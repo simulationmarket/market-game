@@ -66,7 +66,7 @@ const _myProductSet = (roundsHistory) => {
 
 // --- Principal ---
 document.addEventListener('DOMContentLoaded', () => {
-  // Esta subpantalla se conecta sola (no usa postMessage)
+  // Esta subpantalla se conecta sola
   window.DISABLE_GLOBAL_SOCKET = true;
   window.DISABLE_POLLING = true;
 
@@ -91,13 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
     timeout: 20000
   });
 
-  // ===== DIAGNÓSTICO GLOBAL: loguea TODO lo que llega =====
+  // ===== DIAGNÓSTICO GLOBAL =====
   try {
     socket.onAny?.((event, ...args) => {
       if (['ping','pong','connect','disconnect'].includes(event)) return;
-      const head = args?.[0];
-      const sample = Array.isArray(head) ? head.slice(0,1) : head;
-      console.debug(LOG, 'onAny <-', event, { sample, extraCount: args.length - 1 });
+      console.debug(LOG, 'onAny <-', event, args?.[0], { extraCount: args.length - 1 });
     });
   } catch {}
 
@@ -111,14 +109,13 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('connect', () => {
     console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
     socket.emit('joinGame', { partidaId, nombre: playerName });
-    socket.emit('identificarJugador', playerName); // STRING
+    socket.emit('identificarJugador', playerName);
 
-    // Pedimos todas las variantes conocidas
+    // Pedimos todas las variantes
     socket.emit('solicitarResultados',          { partidaId, playerName });
     socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
 
-    // Reintento por si el backend los publica tras un “tick”
     setTimeout(() => {
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
       socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
@@ -126,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
-  // Sincronía básica del jugador (trae roundsHistory)
+  // Sync (roundsHistory)
   function handleSync(d = {}) {
     roundsHistory = Array.isArray(d.roundsHistory) ? d.roundsHistory : [];
     gotSync = true;
@@ -136,30 +133,24 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('syncPlayerData', handleSync);
   socket.on('syncJugador',    handleSync);
 
-  // Resultados completos/finales (filas de ventas por producto/segmento/canal)
+  // Resultados completos/finales
   function extractResultados(payload) {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== 'object') return [];
     const candidates = ['resultados','resultadosCompletos','resultadosFinales','data','rows','ventas','items','list'];
-    for (const k of candidates) {
-      if (Array.isArray(payload[k])) return payload[k];
-    }
+    for (const k of candidates) if (Array.isArray(payload[k])) return payload[k];
     if (payload.data && typeof payload.data === 'object') {
-      for (const k of candidates) {
-        if (Array.isArray(payload.data[k])) return payload.data[k];
-      }
+      for (const k of candidates) if (Array.isArray(payload.data[k])) return payload.data[k];
     }
     return [];
   }
 
   function applyResultados(arr, source) {
     if (!arr?.length) return;
-    // Si llegan finales con datos, preferimos esos
     if (source === 'finales') {
       resultados = arr;
-    } else {
-      // Solo reemplazamos con "completos" si aún no tenemos nada útil
-      if (!resultados.length) resultados = arr;
+    } else if (!resultados.length) {
+      resultados = arr;
     }
     gotRes = true;
     console.log(LOG, `aplicados (${source}) filas:`, resultados.length);
@@ -177,19 +168,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleResultadosFinales(payload) {
     const arr = extractResultados(payload);
-    // Debug: mostrar claves de la primera fila
     if (arr?.length) console.log(LOG, 'resultadosFinales keys[0]:', Object.keys(arr[0]));
     console.log(LOG, 'resultadosFinales recibidos:', arr.length);
     applyResultados(arr, 'finales');
   }
   socket.on('resultadosFinales', handleResultadosFinales);
-  socket.on('resumenResultados', handleResultadosFinales); // alias por si acaso
+  socket.on('resumenResultados', handleResultadosFinales);
 
   function tryRender() {
     // 1) Filas del jugador
     let ventasJugador = resultados.filter(r => _matchRowByPlayer(r, playerName));
 
-    // 2) Si no hay, usa productos del jugador según última ronda
+    // 2) Fallback por productos del jugador
     if (ventasJugador.length === 0) {
       const mySet = _myProductSet(roundsHistory);
       ventasJugador = resultados.filter(r => mySet.has(_norm(_rowProducto(r))));
@@ -234,11 +224,9 @@ document.addEventListener('DOMContentLoaded', () => {
         (_matchRowByPlayer(r, playerName)) && _rowProducto(r) === producto
       );
 
-      // Datos del jugador para ventas
       mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, idCanvas);
       mostrarTablaCanal(resultadosJugadorProducto, idTablaCanal);
 
-      // Todos para cuota, filtrando por producto del jugador
       mostrarCuotaPorSegmento(resultados, playerName, idCuotaSeg, producto);
       mostrarCuotaPorCanal(resultados,   playerName, idCuotaCan, producto);
     });
@@ -273,9 +261,13 @@ function mostrarTablaPorProductoYCanal(resultados) {
     const canal = row.canal;
     if (!canal) return;
     if (!agrupado[canal]) agrupado[canal] = { canal, unidades: 0, ingresos: 0 };
-    const uds = Number(row.unidadesNetas ?? row.unidadesVendidas) || 0;
-    agrupado[canal].unidades += uds;
-    agrupado[canal].ingresos += Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || 0;
+
+    const udsNetas   = Number(row.unidadesNetas ?? row.unidadesVendidas) || 0;
+    const precio     = Number(row.precio) || 0;
+    const ingresosRow = Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || (precio * udsNetas);
+
+    agrupado[canal].unidades += udsNetas;
+    agrupado[canal].ingresos += ingresosRow;
   });
 
   const tabla = `<table><thead><tr>
@@ -416,10 +408,14 @@ function mostrarTablaCanal(resultados, idDiv) {
   resultados.forEach((row) => {
     const canal = row.canal;
     if (!canal) return;
+
+    const udsNetas   = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
+    const precio     = Number(row.precio) || 0;
+    const ingresosRow = Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || (precio * udsNetas);
+
     agrupado[canal] = agrupado[canal] || { unidades: 0, ingresos: 0 };
-    const uds = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
-    agrupado[canal].unidades += uds;
-    agrupado[canal].ingresos += Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || 0;
+    agrupado[canal].unidades += udsNetas;
+    agrupado[canal].ingresos += ingresosRow;
   });
 
   contenedor.innerHTML = `<table><thead><tr><th>Canal</th><th>Unidades</th><th>Ingresos</th></tr></thead><tbody>${

@@ -25,25 +25,24 @@
     });
     window.__sockCRP = socket;
 
-    // ===== DIAGNÓSTICO GLOBAL: loguea TODO lo que llega =====
+    // ===== DIAGNÓSTICO GLOBAL =====
     try {
       socket.onAny?.((event, ...args) => {
         if (['ping','pong','connect','disconnect'].includes(event)) return;
-        const head = args?.[0];
-        const sample = Array.isArray(head) ? head.slice(0,1) : head;
-        console.debug(LOG, 'onAny <-', event, { sample, extraCount: args.length - 1 });
+        console.debug(LOG, 'onAny <-', event, args?.[0], { extraCount: args.length - 1 });
       });
     } catch {}
 
+    // Estado
     let roundsHistory = [];
-    let resultados = [];            // acumularemos tanto "completos" como "finales"
+    let resultados = [];
+    let syncData = null;
     let gotSync = false;
     let gotRes  = false;
 
+    // Utils
     const norm = s => String(s ?? '').trim().toLowerCase();
     const n = v => Number(v) || 0;
-
-    // === util: primer numérico encontrado entre varias claves ===
     const num = (row, ...keys) => {
       for (const k of keys) {
         const v = row?.[k];
@@ -55,7 +54,6 @@
       return 0;
     };
 
-    // Campos alternativos para nombre de jugador y producto
     const getRowPlayer = (row={}) =>
       row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre ?? row.player ?? row.playerName ?? row.company;
 
@@ -70,17 +68,17 @@
 
     const maybeRender = () => { if (gotSync && gotRes) tryRender(); };
 
+    // Conexión
     socket.on('connect', () => {
       console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
       socket.emit('joinGame', { partidaId, nombre: playerName });
-      socket.emit('identificarJugador', playerName); // STRING
+      socket.emit('identificarJugador', playerName);
 
       // Pedimos todas las variantes conocidas
       socket.emit('solicitarResultados',          { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
       socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
 
-      // reintento por si el backend los publica tras un “tick”
       setTimeout(() => {
         socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
         socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
@@ -89,10 +87,11 @@
 
     socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
-    // roundsHistory del jugador
+    // Sync de jugador
     function handleSync(d = {}) {
+      syncData = d;
       roundsHistory = Array.isArray(d.roundsHistory) ? d.roundsHistory : [];
-      window.__roundsHistory = roundsHistory; // buffer
+      window.__roundsHistory = roundsHistory;
       gotSync = true;
       console.log(LOG, 'syncPlayerData rounds:', roundsHistory.length);
       maybeRender();
@@ -100,39 +99,35 @@
     socket.on('syncPlayerData', handleSync);
     socket.on('syncJugador',    handleSync);
 
-    // ====== extracción tolerante ======
+    // Extracción de arrays
     function extractArray(payload) {
       if (Array.isArray(payload)) return payload;
       if (!payload || typeof payload !== 'object') return [];
       const candidates = ['resultados','resultadosCompletos','resultadosFinales','data','rows','ventas','items','list','filas','productos'];
-      for (const k of candidates) {
-        if (Array.isArray(payload[k])) return payload[k];
-      }
+      for (const k of candidates) if (Array.isArray(payload[k])) return payload[k];
       if (payload.data && typeof payload.data === 'object') {
-        for (const k of candidates) {
-          if (Array.isArray(payload.data[k])) return payload.data[k];
-        }
+        for (const k of candidates) if (Array.isArray(payload.data[k])) return payload.data[k];
       }
       return [];
     }
 
-    function mergeResultados(arr) {
+    // Preferimos FINALES; COMPLETOS sólo si no hay nada
+    function applyResultados(arr, source) {
       if (!arr?.length) return;
-      // log de claves para la primera fila (diagnóstico)
-      const first = arr[0] || {};
-      console.log(LOG, 'keys primera fila:', Object.keys(first));
-
-      resultados = resultados.concat(arr);
+      if (source === 'finales') {
+        resultados = arr;
+      } else if (!resultados.length) {
+        resultados = arr;
+      }
       gotRes = true;
-      console.log(LOG, 'acumulado filas:', resultados.length);
+      console.log(LOG, `aplicados (${source}) filas:`, resultados.length);
       maybeRender();
     }
 
-    // ====== listeners de resultados ======
     function handleResultados(payload) {
       const arr = extractArray(payload);
       console.log(LOG, 'resultadosCompletos filas:', arr.length);
-      mergeResultados(arr);
+      applyResultados(arr, 'completos');
     }
     socket.on('resultadosCompletos', handleResultados);
     socket.on('resultados',          handleResultados);
@@ -140,41 +135,57 @@
 
     function handleResultadosFinales(payload) {
       const arr = extractArray(payload);
+      if (arr?.length) console.log(LOG, 'keys primera fila:', Object.keys(arr[0]));
       console.log(LOG, 'resultadosFinales filas:', arr.length);
-      mergeResultados(arr);
+      applyResultados(arr, 'finales');
     }
     socket.on('resultadosFinales', handleResultadosFinales);
-    // por si el servidor usa otro alias
     socket.on('resumenResultados', handleResultadosFinales);
 
-    // ====== RENDER ======
+    // Construye mapas de publicidad y coste unitario (prioriza costeUnitarioReal)
+    function buildPubCostMaps(roundData, syncData) {
+      const pubMap = {};
+      const costMap = {};
+      const addFromList = (list = []) => {
+        list.forEach(p => {
+          const name = p?.nombre || p?.productName;
+          if (!name) return;
+          const k = norm(name);
+
+          if (pubMap[k] == null) {
+            const pub = Number(p.presupuestoPublicidad ?? p.publicidad);
+            if (!Number.isNaN(pub)) pubMap[k] = pub;
+          }
+          if (costMap[k] == null) {
+            const cu = p.costeUnitarioReal ?? p.costeUnitarioEst ?? p.costeUnitario ?? p.costUnit;
+            const cuNum = Number(cu);
+            if (!Number.isNaN(cuNum)) costMap[k] = cuNum;
+          }
+        });
+      };
+
+      addFromList(roundData?.decisiones?.products || roundData?.roundDecisions?.products || []);
+      addFromList(syncData?.products || []);
+      return { pubMap, costMap };
+    }
+
+    // RENDER
     function tryRender() {
       if (!playerName) { emptyState('Falta playerName en la URL o localStorage.'); return; }
+      if (!resultados.length) { emptyState('Sin datos para tu jugador/productos todavía.'); return; }
 
-      if (!resultados.length) {
-        emptyState('Sin datos para tu jugador/productos todavía.');
-        return;
-      }
-
-      // 1) Filas del jugador
+      // Filas del jugador
       let filas = resultados.filter(r => matchesPlayer(r, playerName));
 
-      // 2) Fallback por productos del jugador según última ronda
+      // Fallback por productos del jugador (última ronda)
       const last = roundsHistory[roundsHistory.length - 1];
       if (filas.length === 0 && last?.decisiones?.products?.length) {
         const mySet = new Set((last.decisiones.products || []).map(p => norm(p?.nombre)).filter(Boolean));
         filas = resultados.filter(r => mySet.has(norm(getRowProducto(r))));
       }
+      if (filas.length === 0) { emptyState('Recibimos resultados, pero ninguno coincide con tu jugador o productos.'); return; }
 
-      if (filas.length === 0) {
-        emptyState('Recibimos resultados, pero ninguno coincide con tu jugador o productos.');
-        return;
-      }
-
-      // 3) Consolidar por producto con lectura tolerante
-      const consol = consolidarPorProducto(filas, last);
-
-      // 4) Pintar
+      const consol = consolidarPorProducto(filas, roundsHistory[roundsHistory.length - 1] || {});
       generarTabla(consol);
       generarGrafico(consol);
     }
@@ -186,8 +197,9 @@
       if (canvas?.getContext) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
     }
 
-    // ====== Consolidación por producto (tolerante de claves) ======
     function consolidarPorProducto(filasJugador, roundData) {
+      const { pubMap, costMap } = buildPubCostMaps(roundData, syncData);
+
       const porProducto = {};
       const totJugador = {
         facturacionBruta: 0,
@@ -202,14 +214,6 @@
         resultadoNeto:    0
       };
 
-      // Mapa de publicidad por NOMBRE de producto
-      const pubMap = {};
-      const prodList = roundData?.decisiones?.products || [];
-      prodList.forEach(p => {
-        if (p?.nombre) pubMap[norm(p.nombre)] = n(p.presupuestoPublicidad ?? p.publicidad);
-      });
-
-      // Agrupar y sumar partidas (con claves alternativas)
       filasJugador.forEach(r => {
         const prodName = getRowProducto(r);
         if (!prodName) return;
@@ -234,26 +238,45 @@
 
         const c = porProducto[key];
 
-        // claves alternativas habituales
-        const factBruta = num(r, 'facturacionBruta','ingresosBrutos','facturacion_total','ventasBrutas','facturacion','ingresos');
-        const factNeta  = num(r, 'facturacionNeta','ingresos','ventasNetas','netRevenue');
-        const coste     = num(r, 'costeVentasProducto','costeVentas','costoVentas','cost_of_goods','cogs');
-        let margen      = num(r, 'margenBrutoProducto','margenBruto','grossMargin','margen');
-        if (!margen) margen = factNeta - coste;
-        const excedente = num(r, 'excedente','stockExcedente','exceso');
+        // Valores primarios de resultadosFinales
+        const precio       = num(r, 'precio','price');
+        const udsVendidas  = num(r, 'unidadesVendidas');
+        const udsDevueltas = num(r, 'unidadesDevueltas');
+        const udsNetas     = num(r, 'unidadesNetas');
+        const excedenteUds = num(r, 'excedente','stockExcedente','exceso');
 
+        // Facturación derivada si falta
+        let factBruta = num(r, 'facturacionBruta','ingresosBrutos','facturacion_total','ventasBrutas','facturacion','ingresos');
+        let factNeta  = num(r, 'facturacionNeta','ingresos','ventasNetas','netRevenue');
+        if (!factBruta && precio && udsVendidas) factBruta = precio * udsVendidas;
+        if (!factNeta  && precio && udsNetas)   factNeta  = precio * udsNetas;
+
+        // Coste de ventas: backend o coste unitario × uds netas (prioriza costeUnitarioReal)
+        const costUnit = costMap[norm(prodName)] || 0;
+        let coste = num(r, 'costeVentasProducto','costeVentas','costoVentas','cost_of_goods','cogs');
+        if (!coste && costUnit && udsNetas) coste = costUnit * udsNetas;
+
+        // Margen: si no viene, neta - coste
+        let margen = num(r, 'margenBrutoProducto','margenBruto','grossMargin','margen');
+        if (!margen) margen = factNeta - (coste || 0);
+
+        // Devoluciones en €
+        const devolucionesImporte = (factBruta && factNeta) ? (factBruta - factNeta)
+          : (precio && udsDevueltas) ? (precio * udsDevueltas) : 0;
+
+        // Acumulados
         c.facturacionBruta += factBruta;
         c.facturacionNeta  += factNeta;
         c.costeVentas      += coste;
         c.margenBruto      += margen;
-        c.devoluciones     += Math.max(0, factBruta - factNeta);
-        c.costesAlmacenaje += excedente * 20;
+        c.devoluciones     += Math.max(0, devolucionesImporte);
+        c.costesAlmacenaje += excedenteUds * 20;
 
         totJugador.facturacionBruta += factBruta;
         totJugador.facturacionNeta  += factNeta;
         totJugador.costeVentas      += coste;
         totJugador.margenBruto      += margen;
-        totJugador.costesAlmacenaje += excedente * 20;
+        totJugador.costesAlmacenaje += excedenteUds * 20;
       });
 
       // Publicidad por nombre
@@ -262,7 +285,7 @@
         totJugador.gastosPublicidad += c.gastosPublicidad;
       });
 
-      // Gastos comerciales del jugador: prorrateo si es necesario
+      // Gastos comerciales prorrateados si vienen a nivel jugador/ronda
       const brutaJugador = totJugador.facturacionBruta || 0;
       const gcGlobal = num(roundData || {}, 'gastosComerciales');
       let gastosComercialesJugador = num(roundData || {}, 'gastosComercialesJugador');
@@ -276,14 +299,14 @@
         totJugador.gastosComerciales += c.gastosComerciales;
       });
 
-      // Gastos financieros (prorrateo si vienen a nivel jugador/ronda)
+      // Gastos financieros prorrateados
       const gfJugador = num(roundData || {}, 'gastosFinancieros','costesFinancieros');
       Object.values(porProducto).forEach(c => {
         const pct = brutaJugador > 0 ? (c.facturacionBruta / brutaJugador) : 0;
         c.gastosFinancieros = gfJugador * pct;
       });
 
-      // Métricas derivadas por producto
+      // Métricas derivadas
       Object.values(porProducto).forEach(c => {
         c.BAII = c.margenBruto - c.gastosComerciales - c.gastosPublicidad - c.costesAlmacenaje;
         c.BAI  = c.BAII - c.gastosFinancieros;
@@ -298,7 +321,7 @@
       return Object.values(porProducto);
     }
 
-    // ====== UI ======
+    // ===== UI =====
     function generarTabla(productosConsolidados) {
       const cont = document.getElementById('tabla-contenedor');
       if (!cont) return;
