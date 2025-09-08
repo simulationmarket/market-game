@@ -176,6 +176,48 @@ io.getOrCreatePartida = getOrCreatePartida;
 // ====== Health checks para Koyeb ======
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }));
 app.get('/readyz', (_req, res) => res.status(200).json({ status: 'ready' }));
+// ✅ Prueba rápida de base de datos (colocada antes del fallback SPA)
+app.get('/db/test', async (req, res) => {
+  try {
+    const codigo = 'PRUEBA-UNO';
+
+    // 1) Asegura Partida
+    const partida = await prisma.partida.upsert({
+      where: { codigo },
+      update: {},
+      create: { codigo, estado: 'lobby' },
+      select: { id: true, codigo: true }
+    });
+
+    // 2) Jugador de prueba
+    const jugador = await prisma.jugador.create({
+      data: { nombre: 'Tester', esBot: false, budget: BigInt(0), partidaId: partida.id },
+      select: { id: true }
+    });
+
+    // 3) Ronda de prueba
+    const ronda = await prisma.ronda.create({
+      data: { numero: 1, partidaId: partida.id },
+      select: { id: true }
+    });
+
+    // 4) Decision de prueba
+    await prisma.decision.create({
+      data: {
+        jugadorId: jugador.id,
+        partidaId: partida.id,
+        rondaId: ronda.id,
+        data: { prueba: true, ts: Date.now() }
+      }
+    });
+
+    res.json({ ok: true, codigo: partida.codigo });
+  } catch (e) {
+    console.error('[DB TEST] Error:', e);
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 
 // ====== API ======
 app.use('/api', playerRoutes);
