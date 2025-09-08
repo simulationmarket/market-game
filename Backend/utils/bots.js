@@ -150,41 +150,102 @@ function estimarDemandaEsperada(producto, segmento, resultadosCache, nombreBot, 
 
   const resultados = Array.isArray(resultadosCache) ? resultadosCache : [];
 
+  // Demanda total del segmento (ronda previa)
   const demandaTotalSegmento = resultados
     .filter(r => r.segmento === segmento)
     .reduce((acc, r) => acc + Number(r.demanda || 0), 0);
 
+  // Ventas del bot en ese segmento (ronda previa)
   const ventasBot = resultados
-    .filter(r => r.jugador === nombreBot && r.producto === producto.nombre)
-    .reduce((sum, r) => sum + Number(r.unidadesVendidas || 0), 0);
+    .filter(r => r.jugador === nombreBot && r.segmento === segmento)
+    .reduce((sum, r) => sum + Number(r.unidadesVendidas || r.unidadesNetas || 0), 0);
 
-  const cuotaBot = demandaTotalSegmento > 0 ? ventasBot / demandaTotalSegmento : 0;
+  // Nº competidores activos en el segmento
+  const competidores = (() => {
+    const set = new Set();
+    resultados.forEach(r => {
+      if (r.segmento === segmento && Number(r.unidadesVendidas || r.unidadesNetas || 0) > 0) {
+        set.add(r.jugador);
+      }
+    });
+    return Math.max(1, set.size);
+  })();
 
+  const cuotaBot = demandaTotalSegmento > 0 ? (ventasBot / demandaTotalSegmento) : 0;
+  const cuotaBase = 1 / competidores;
+
+  // Mezcla conservadora: evita colapsar si una ronda salió mal
+  const cuotaSuavizada = Math.min(1, (0.7 * cuotaBase) + (0.3 * cuotaBot));
+
+  // Demanda teórica del segmento para la ronda actual
   const segData = marketData.segmentos[segmento];
   const pct = segData[`demandaAno${rondaActual + 1}`] ?? segData.demandaAno1;
   const demandaTeorica = segData.usuariosPotenciales * (pct / 100);
 
-  const demandaEstim = demandaTeorica * cuotaBot;
-  return Math.round(demandaEstim);
+  const demandaEstim = Math.round(demandaTeorica * cuotaSuavizada);
+
+  // LOG útil para Koyeb
+  try {
+    console.log('[BOT] Estimación', {
+      jugador: nombreBot,
+      producto: producto.nombre,
+      segmento,
+      ronda: rondaActual,
+      competidores,
+      cuotaBot: +cuotaBot.toFixed(4),
+      cuotaBase: +cuotaBase.toFixed(4),
+      cuotaSuavizada: +cuotaSuavizada.toFixed(4),
+      demandaTeorica: Math.round(demandaTeorica),
+      demandaEstim
+    });
+  } catch {}
+
+  return demandaEstim;
 }
+
 
 function decidirUnidadesAFabricar(producto, demandaEstimada, stockPrevio, dificultad, presupuestoWrapper) {
   const costeUnitario = producto.costeUnitarioEst || 1000;
-  const deficit = Math.max(0, demandaEstimada - stockPrevio);
 
   // Colchón según dificultad
   let margen = 0;
-  if (dificultad === 'facil') margen = 0.20;
-  if (dificultad === 'normal') margen = 0.10;
+  if (dificultad === 'facil')   margen = 0.20;
+  if (dificultad === 'normal')  margen = 0.10;
   if (dificultad === 'dificil') margen = 0.02;
 
-  const unidadesDeseadas = Math.ceil(deficit * (1 + margen));
-  const unidadesPosibles = Math.floor(presupuestoWrapper.valor / costeUnitario);
+  // Suelo: no fabriques por debajo del 90% de la demanda estimada
+  const sueloProduccion = Math.ceil(demandaEstimada * 0.90);
 
-  const unidadesFabricar = Math.min(unidadesDeseadas, unidadesPosibles);
+  const deficit = Math.max(0, demandaEstimada - stockPrevio);
+  const objetivoConColchon = Math.ceil(deficit * (1 + margen));
+
+  // Usa el mayor entre suelo y objetivo con colchón
+  const unidadesDeseadas = Math.max(sueloProduccion, objetivoConColchon);
+
+  // Límite por presupuesto
+  const unidadesPosibles = Math.floor(presupuestoWrapper.valor / costeUnitario);
+  const unidadesFabricar = Math.max(0, Math.min(unidadesDeseadas, unidadesPosibles));
+
   presupuestoWrapper.valor -= unidadesFabricar * costeUnitario;
+
+  try {
+    console.log('[BOT] Producción', {
+      producto: producto.nombre,
+      demandaEstimada,
+      stockPrevio,
+      margen,
+      sueloProduccion,
+      objetivoConColchon,
+      unidadesDeseadas,
+      unidadesPosibles,
+      unidadesFabricar,
+      budgetRestante: Math.round(presupuestoWrapper.valor)
+    });
+  } catch {}
+
   return unidadesFabricar;
 }
+
 
 function decidirPrecio(producto, segmento, resultadosAnteriores, dificultad) {
   const fn = segmento.funcionSensibilidad;
