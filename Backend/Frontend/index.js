@@ -16,9 +16,10 @@ socket.io.engine.on('upgrade', () => {
   console.log('upgrade a:', socket.io.engine.transport.name);
 });
 socket.on('connect_error', e => console.log('[connect_error]', e?.message));
+
 // --- Elementos de la UI ---
 const playerNameInput = document.getElementById("playerName");
-const partidaIdInput   = document.getElementById("partidaId");
+const partidaIdInput  = document.getElementById("partidaId");
 const readyButton     = document.getElementById("readyButton");
 const newCodeBtn      = document.getElementById("newCodeBtn");
 const copyLinkBtn     = document.getElementById("copyLink");
@@ -28,11 +29,15 @@ const statusText      = document.getElementById("status");
 const params = new URLSearchParams(location.search);
 const urlPartidaId = params.get("partidaId");
 const savedName = localStorage.getItem("playerName");
-const savedRoom = localStorage.getItem("partidaId");
 
 if (savedName) playerNameInput.value = savedName;
-if (urlPartidaId) partidaIdInput.value = urlPartidaId;
-else if (savedRoom) partidaIdInput.value = savedRoom;
+
+// ✅ Siempre generar un código nuevo salvo que venga en la URL
+if (urlPartidaId) {
+  partidaIdInput.value = urlPartidaId;
+} else {
+  partidaIdInput.value = generarCodigo();
+}
 
 // Utilidad mensajes
 function mostrarMensaje(texto, color) {
@@ -63,7 +68,7 @@ copyLinkBtn.addEventListener("click", async () => {
 
 function actualizarInvitacionEnlace() {
   const code = (partidaIdInput.value || "").trim() || generarCodigo();
-  const url = new URL(location.href);
+  const url = new URL(location.href);          // enlace al lobby con el código pre-rellenado
   url.searchParams.set("partidaId", code);
   return url.toString();
 }
@@ -86,7 +91,7 @@ readyButton.addEventListener("click", () => {
     partidaIdInput.value = partidaId;
   }
 
-  // Guardar en localStorage para game.html
+  // Guardar en localStorage solo para uso de game.html (no se reutiliza en el lobby)
   localStorage.setItem("playerName", playerName);
   localStorage.setItem("partidaId", partidaId);
 

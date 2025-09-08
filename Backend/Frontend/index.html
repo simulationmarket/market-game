@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="index.css" />
   <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" rel="stylesheet" />
   <style>
-    /* Pequeños estilos por si tu index.css no tiene estos */
+    /* Ajustes rápidos encima de index.css */
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .row > * { flex: 1 1 auto; }
     .muted { font-size: .9rem; opacity:.75; }
@@ -18,8 +18,25 @@
     #newCodeBtn { background:#3498db; color:white; }
     #copyLink { background:#8e44ad; color:white; }
     .status-text { margin-top:.5rem; }
-    .container { max-width:620px; margin:6vh auto; display:flex; flex-direction:column; gap:12px; text-align:center; }
-    .logo { width:96px; margin:0 auto 12px; }
+    .container { max-width: 680px; margin:6vh auto; display:flex; flex-direction:column; gap:12px; text-align:center; }
+    .logo { width:160px; margin:0 auto 12px; }
+    /* Log grande y a todo el ancho del recuadro */
+    #log {
+      width: 100%;
+      min-height: 180px;
+      max-height: 320px;
+      overflow: auto;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 12px 14px;
+      text-align: left;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 15px;
+      line-height: 1.45;
+      box-sizing: border-box;
+    }
+    #log p { margin: 0 0 6px; white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -41,6 +58,9 @@
     <button id="readyButton">Estoy Listo</button>
     <div id="status" class="status-text"></div>
     <div id="temporizador" class="status-text" style="margin-top: 10px;"></div>
+
+    <h3 style="margin:14px 0 6px; text-align:left;">Log</h3>
+    <div id="log" aria-live="polite"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
