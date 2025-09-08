@@ -2,7 +2,7 @@
 // Manejador de sockets multi-partida (una sala por partidaId)
 
 let totalPlayersConnected = 0;
-
+const { createGameService } = require('../services/gameService');
 const { actualizarMercado } = require('./market.js');
 const { iniciarCalculos, eventEmitter } = require('../utils/calculos');
 const { tomarDecisionesBot } = require('../utils/bots');
@@ -166,6 +166,21 @@ module.exports = (io, registry) => {
       socket.data.partidaId = pid;
       socket.join(`partida:${pid}`);
       console.log(`Socket ${socket.id} unido a sala partida:${pid}`);
+      // 🔌 Inyecta el servicio de persistencia una vez por partida
+const partidaObj = getPartidaState(registry, pid);
+if (!partidaObj.service) {
+  partidaObj.service = createGameService({
+    players: partidaObj.players,
+    marketData: partidaObj.marketData,
+    resultados: {},          // opcional
+    roundsHistory: {},       // opcional
+    iniciarCalculos,         // ya lo tienes importado arriba
+    eventEmitter,            // ya lo tienes importado arriba
+    tomarDecisionesBot,      // ya lo tienes importado arriba
+    partidaCodigo: pid,      // usamos el pid como “código” de la partida
+  });
+  console.log(`[persist] Servicio Prisma inicializado para partida ${pid}`);
+}
       if (nombre) socket.emit('joinedGame', { partidaId: pid });
     });
 
