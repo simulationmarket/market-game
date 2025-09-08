@@ -45,7 +45,7 @@ const chartsSegmentoPorId = {};
 // --- Helpers de filtrado ---
 const _norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-// campos alternativos: ahora incluye player/playerName/company
+// campos alternativos: incluye player/playerName/company
 const _rowPlayer = (row={}) =>
   row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre ?? row.player ?? row.playerName ?? row.company;
 
@@ -112,9 +112,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
     socket.emit('joinGame', { partidaId, nombre: playerName });
     socket.emit('identificarJugador', playerName); // STRING
+
+    // Pedimos todas las variantes conocidas
     socket.emit('solicitarResultados',          { partidaId, playerName });
     socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
-    setTimeout(() => socket.emit('solicitarResultadosCompletos', { partidaId, playerName }), 1500);
+    socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
+
+    // Reintento por si el backend los publica tras un “tick”
+    setTimeout(() => {
+      socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+      socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
+    }, 1500);
   });
   socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
@@ -128,11 +136,11 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('syncPlayerData', handleSync);
   socket.on('syncJugador',    handleSync);
 
-  // Resultados completos (filas de ventas por producto/segmento/canal)
+  // Resultados completos/finales (filas de ventas por producto/segmento/canal)
   function extractResultados(payload) {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== 'object') return [];
-    const candidates = ['resultados','resultadosCompletos','data','rows','ventas','items','list'];
+    const candidates = ['resultados','resultadosCompletos','resultadosFinales','data','rows','ventas','items','list'];
     for (const k of candidates) {
       if (Array.isArray(payload[k])) return payload[k];
     }
@@ -144,16 +152,38 @@ document.addEventListener('DOMContentLoaded', () => {
     return [];
   }
 
-  function handleResultados(payload) {
-    resultados = extractResultados(payload);
+  function applyResultados(arr, source) {
+    if (!arr?.length) return;
+    // Si llegan finales con datos, preferimos esos
+    if (source === 'finales') {
+      resultados = arr;
+    } else {
+      // Solo reemplazamos con "completos" si aún no tenemos nada útil
+      if (!resultados.length) resultados = arr;
+    }
     gotRes = true;
-    console.log(LOG, 'resultadosCompletos filas:', resultados.length);
-    window.__VENTAS_debug = { resultadosSample: resultados.slice(0,3) };
+    console.log(LOG, `aplicados (${source}) filas:`, resultados.length);
     maybeRender();
+  }
+
+  function handleResultados(payload) {
+    const arr = extractResultados(payload);
+    console.log(LOG, 'resultadosCompletos recibidos:', arr.length);
+    applyResultados(arr, 'completos');
   }
   socket.on('resultadosCompletos', handleResultados);
   socket.on('resultados',          handleResultados);
   socket.on('ventasCompletas',     handleResultados);
+
+  function handleResultadosFinales(payload) {
+    const arr = extractResultados(payload);
+    // Debug: mostrar claves de la primera fila
+    if (arr?.length) console.log(LOG, 'resultadosFinales keys[0]:', Object.keys(arr[0]));
+    console.log(LOG, 'resultadosFinales recibidos:', arr.length);
+    applyResultados(arr, 'finales');
+  }
+  socket.on('resultadosFinales', handleResultadosFinales);
+  socket.on('resumenResultados', handleResultadosFinales); // alias por si acaso
 
   function tryRender() {
     // 1) Filas del jugador

@@ -23,7 +23,6 @@
       reconnectionAttempts: Infinity,
       timeout: 20000
     });
-    // buffers de diagnóstico
     window.__sockCRP = socket;
 
     // ===== DIAGNÓSTICO GLOBAL: loguea TODO lo que llega =====
@@ -37,12 +36,24 @@
     } catch {}
 
     let roundsHistory = [];
-    let resultados = [];
+    let resultados = [];            // acumularemos tanto "completos" como "finales"
     let gotSync = false;
     let gotRes  = false;
 
     const norm = s => String(s ?? '').trim().toLowerCase();
     const n = v => Number(v) || 0;
+
+    // === util: primer numérico encontrado entre varias claves ===
+    const num = (row, ...keys) => {
+      for (const k of keys) {
+        const v = row?.[k];
+        if (v != null && v !== '') {
+          const x = Number(v);
+          if (!Number.isNaN(x)) return x;
+        }
+      }
+      return 0;
+    };
 
     // Campos alternativos para nombre de jugador y producto
     const getRowPlayer = (row={}) =>
@@ -63,10 +74,17 @@
       console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
       socket.emit('joinGame', { partidaId, nombre: playerName });
       socket.emit('identificarJugador', playerName); // STRING
+
+      // Pedimos todas las variantes conocidas
       socket.emit('solicitarResultados',          { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
-      // reintento por si el backend espera un poco
-      setTimeout(() => socket.emit('solicitarResultadosCompletos', { partidaId, playerName }), 1500);
+      socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
+
+      // reintento por si el backend los publica tras un “tick”
+      setTimeout(() => {
+        socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+        socket.emit('solicitarResultadosFinales',   { partidaId, playerName });
+      }, 1500);
     });
 
     socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
@@ -82,18 +100,14 @@
     socket.on('syncPlayerData', handleSync);
     socket.on('syncJugador',    handleSync);
 
-    // resultados completos (todas las filas)
-    function extractResultados(payload) {
+    // ====== extracción tolerante ======
+    function extractArray(payload) {
       if (Array.isArray(payload)) return payload;
       if (!payload || typeof payload !== 'object') return [];
-      // prueba varias claves comunes
-      const candidates = [
-        'resultados', 'resultadosCompletos', 'data', 'rows', 'ventas', 'items', 'list'
-      ];
+      const candidates = ['resultados','resultadosCompletos','resultadosFinales','data','rows','ventas','items','list','filas','productos'];
       for (const k of candidates) {
         if (Array.isArray(payload[k])) return payload[k];
       }
-      // a veces viene { ok:true, data:{ rows:[...] } }
       if (payload.data && typeof payload.data === 'object') {
         for (const k of candidates) {
           if (Array.isArray(payload.data[k])) return payload.data[k];
@@ -102,32 +116,45 @@
       return [];
     }
 
-    function handleResultados(payload) {
-      resultados = extractResultados(payload);
-      window.__ultimosResultados = resultados; // buffer para inspección
+    function mergeResultados(arr) {
+      if (!arr?.length) return;
+      // log de claves para la primera fila (diagnóstico)
+      const first = arr[0] || {};
+      console.log(LOG, 'keys primera fila:', Object.keys(first));
+
+      resultados = resultados.concat(arr);
       gotRes = true;
-      console.log(LOG, 'resultadosCompletos filas:', resultados.length);
-      if (resultados.length) {
-        const demo = resultados.slice(0, 3).map(r => ({
-          jugador: getRowPlayer(r),
-          producto: getRowProducto(r),
-          facturacionBruta: r.facturacionBruta,
-          facturacionNeta:  r.facturacionNeta,
-          costeVentasProducto: r.costeVentasProducto,
-          margenBrutoProducto: r.margenBrutoProducto,
-          excedente: r.excedente
-        }));
-        console.log(LOG, 'muestra filas:', demo);
-      }
+      console.log(LOG, 'acumulado filas:', resultados.length);
       maybeRender();
     }
-    socket.on('resultadosCompletos', handleResultados);
-    // por si el backend usa otro nombre
-    socket.on('resultados', handleResultados);
-    socket.on('ventasCompletas', handleResultados);
 
+    // ====== listeners de resultados ======
+    function handleResultados(payload) {
+      const arr = extractArray(payload);
+      console.log(LOG, 'resultadosCompletos filas:', arr.length);
+      mergeResultados(arr);
+    }
+    socket.on('resultadosCompletos', handleResultados);
+    socket.on('resultados',          handleResultados);
+    socket.on('ventasCompletas',     handleResultados);
+
+    function handleResultadosFinales(payload) {
+      const arr = extractArray(payload);
+      console.log(LOG, 'resultadosFinales filas:', arr.length);
+      mergeResultados(arr);
+    }
+    socket.on('resultadosFinales', handleResultadosFinales);
+    // por si el servidor usa otro alias
+    socket.on('resumenResultados', handleResultadosFinales);
+
+    // ====== RENDER ======
     function tryRender() {
       if (!playerName) { emptyState('Falta playerName en la URL o localStorage.'); return; }
+
+      if (!resultados.length) {
+        emptyState('Sin datos para tu jugador/productos todavía.');
+        return;
+      }
 
       // 1) Filas del jugador
       let filas = resultados.filter(r => matchesPlayer(r, playerName));
@@ -140,11 +167,11 @@
       }
 
       if (filas.length === 0) {
-        emptyState('Sin datos para tu jugador/productos todavía.');
+        emptyState('Recibimos resultados, pero ninguno coincide con tu jugador o productos.');
         return;
       }
 
-      // 3) Consolidar por producto con campos EXACTOS de tu backend
+      // 3) Consolidar por producto con lectura tolerante
       const consol = consolidarPorProducto(filas, last);
 
       // 4) Pintar
@@ -159,7 +186,7 @@
       if (canvas?.getContext) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
     }
 
-    // ====== Consolidación por producto ======
+    // ====== Consolidación por producto (tolerante de claves) ======
     function consolidarPorProducto(filasJugador, roundData) {
       const porProducto = {};
       const totJugador = {
@@ -182,7 +209,7 @@
         if (p?.nombre) pubMap[norm(p.nombre)] = n(p.presupuestoPublicidad ?? p.publicidad);
       });
 
-      // Agrupar y sumar partidas ya calculadas por el backend
+      // Agrupar y sumar partidas (con claves alternativas)
       filasJugador.forEach(r => {
         const prodName = getRowProducto(r);
         if (!prodName) return;
@@ -207,17 +234,19 @@
 
         const c = porProducto[key];
 
-        const factBruta = n(r.facturacionBruta);
-        const factNeta  = n(r.facturacionNeta);
-        const coste     = n(r.costeVentasProducto);
-        const margen    = n(r.margenBrutoProducto);
-        const excedente = n(r.excedente);
+        // claves alternativas habituales
+        const factBruta = num(r, 'facturacionBruta','ingresosBrutos','facturacion_total','ventasBrutas','facturacion','ingresos');
+        const factNeta  = num(r, 'facturacionNeta','ingresos','ventasNetas','netRevenue');
+        const coste     = num(r, 'costeVentasProducto','costeVentas','costoVentas','cost_of_goods','cogs');
+        let margen      = num(r, 'margenBrutoProducto','margenBruto','grossMargin','margen');
+        if (!margen) margen = factNeta - coste;
+        const excedente = num(r, 'excedente','stockExcedente','exceso');
 
         c.facturacionBruta += factBruta;
         c.facturacionNeta  += factNeta;
         c.costeVentas      += coste;
         c.margenBruto      += margen;
-        c.devoluciones     += (factBruta - factNeta);
+        c.devoluciones     += Math.max(0, factBruta - factNeta);
         c.costesAlmacenaje += excedente * 20;
 
         totJugador.facturacionBruta += factBruta;
@@ -233,12 +262,12 @@
         totJugador.gastosPublicidad += c.gastosPublicidad;
       });
 
-      // Gastos comerciales del jugador: si no vienen claros, prorratear
+      // Gastos comerciales del jugador: prorrateo si es necesario
       const brutaJugador = totJugador.facturacionBruta || 0;
-      const gcGlobal = n(roundData?.gastosComerciales);
-      let gastosComercialesJugador = n(roundData?.gastosComercialesJugador);
+      const gcGlobal = num(roundData || {}, 'gastosComerciales');
+      let gastosComercialesJugador = num(roundData || {}, 'gastosComercialesJugador');
       if (!gastosComercialesJugador) {
-        const brutaGlobal = n(roundData?.facturacionBruta);
+        const brutaGlobal = num(roundData || {}, 'facturacionBruta');
         gastosComercialesJugador = (brutaGlobal > 0 && brutaJugador > 0) ? (gcGlobal * (brutaJugador / brutaGlobal)) : 0;
       }
       Object.values(porProducto).forEach(c => {
@@ -248,7 +277,7 @@
       });
 
       // Gastos financieros (prorrateo si vienen a nivel jugador/ronda)
-      const gfJugador = n(roundData?.gastosFinancieros ?? roundData?.costesFinancieros);
+      const gfJugador = num(roundData || {}, 'gastosFinancieros','costesFinancieros');
       Object.values(porProducto).forEach(c => {
         const pct = brutaJugador > 0 ? (c.facturacionBruta / brutaJugador) : 0;
         c.gastosFinancieros = gfJugador * pct;
@@ -265,9 +294,7 @@
         totJugador.resultadoNeto += c.resultadoNeto;
       });
 
-      // (Opcional) Log de consistencia interna
       console.log(LOG, 'totalesJugador (internos):', totJugador);
-
       return Object.values(porProducto);
     }
 
@@ -333,7 +360,6 @@
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
 
-      // Destruye gráfico previo si existe
       const prev = typeof Chart?.getChart === 'function' ? (Chart.getChart('gastosProductoChart') || Chart.getChart(canvas)) : null;
       if (prev) prev.destroy();
 
