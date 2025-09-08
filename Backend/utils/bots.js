@@ -16,19 +16,16 @@ function tomarDecisionesBot(nombreBot, dificultad, gameState, marketData, result
   );
 }
 
+/* ======================== PRIMERA RONDA ======================== */
 function tomarDecisionesPrimeraRonda(nombreBot, dificultad, gameState, marketData) {
-  const decisiones = {
-    products: [],
-    canalesDistribucion: {}
-  };
-
+  const decisiones = { products: [], canalesDistribucion: {} };
   const productos = gameState.products || [];
   const presupuestoWrapper = { valor: gameState.budget || 0 };
 
   productos.forEach((producto, index) => {
     const segmentoObjetivo = asignarSegmentoPorProducto(producto, marketData);
     producto.segmentoObjetivo = segmentoObjetivo;
-    console.log(`🧠 Bot ${nombreBot} - Producto ${index} se dirige al segmento: ${segmentoObjetivo}`);
+    console.log(`🧠 Bot ${nombreBot} - Producto ${index} → segmento ${segmentoObjetivo}`);
 
     const precioOptimo = calcularPrecioOptimo(marketData.segmentos[segmentoObjetivo]);
     const precioFinal = ajustarPrecioPorDificultad(precioOptimo, dificultad);
@@ -50,13 +47,12 @@ function tomarDecisionesPrimeraRonda(nombreBot, dificultad, gameState, marketDat
 
   decisiones.canalesDistribucion = decidirCanalesDistribucionPrimeraRonda(presupuestoWrapper);
 
-  // Actualizar presupuesto restante en gameState
+  // Guardar presupuesto restante
   gameState.budget = presupuestoWrapper.valor;
-
   return decisiones;
 }
 
-// ======================== 🔁 RONDAS POSTERIORES ==========================
+/* ======================== RONDAS POSTERIORES ======================== */
 function tomarDecisionesRondasPosteriores(
   nombreBot, dificultad, gameState, marketData, resultadosCache
 ) {
@@ -96,11 +92,7 @@ function tomarDecisionesRondasPosteriores(
       marketData
     );
 
-    const publicidad = decidirPublicidad(
-      producto,
-      resultadosAnteriores,
-      presupuestoWrapper
-    );
+    const publicidad = decidirPublicidad(producto, resultadosAnteriores, presupuestoWrapper);
 
     const unidadesFabricar = decidirUnidadesAFabricar(
       producto,
@@ -130,39 +122,29 @@ function tomarDecisionesRondasPosteriores(
     nombreBot
   );
 
-  // Guardar presupuesto restante
   gameState.budget = presupuestoWrapper.valor;
-
   return decisiones;
 }
 
-// ======================== 🔩 FUNCIONES A IMPLEMENTAR ==========================
+/* ======================== LÓGICA DE APOYO ======================== */
 
-// 🧠 Paso 1: Reevaluar segmento objetivo según atributos del producto
+// Reevaluar segmento según distancia al ideal
 function reelegirSegmentoObjetivo(producto, segmentosIdeales) {
-  let mejorSegmento = null;
-  let menorDiferencia = Infinity;
-
+  let mejorSegmento = null, menorDiferencia = Infinity;
   for (const nombreSegmento in segmentosIdeales) {
-    const productoIdeal = segmentosIdeales[nombreSegmento].productoIdeal;
-    let diferenciaTotal = 0;
-
-    for (const caracteristica in productoIdeal) {
-      if (caracteristica === "promedio") continue;
-      const valorProducto = producto.caracteristicas?.[caracteristica] || 0;
-      const valorIdeal = productoIdeal[caracteristica];
-      diferenciaTotal += Math.abs(valorProducto - valorIdeal);
+    const ideal = segmentosIdeales[nombreSegmento].productoIdeal;
+    let diff = 0;
+    for (const k in ideal) {
+      if (k === 'promedio') continue;
+      const vProd = producto.caracteristicas?.[k] || 0;
+      diff += Math.abs(vProd - ideal[k]);
     }
-
-    if (diferenciaTotal < menorDiferencia) {
-      menorDiferencia = diferenciaTotal;
-      mejorSegmento = nombreSegmento;
-    }
+    if (diff < menorDiferencia) { menorDiferencia = diff; mejorSegmento = nombreSegmento; }
   }
-
   return mejorSegmento;
 }
 
+// Demanda esperada para el producto del bot
 function estimarDemandaEsperada(producto, segmento, resultadosCache, nombreBot, rondaActual, marketData) {
   if (rondaActual === 0) return 0;
 
@@ -173,42 +155,24 @@ function estimarDemandaEsperada(producto, segmento, resultadosCache, nombreBot, 
     .reduce((acc, r) => acc + Number(r.demanda || 0), 0);
 
   const ventasBot = resultados
-    .filter(r =>
-      r.jugador  === nombreBot &&
-      r.producto === producto.nombre
-    )
+    .filter(r => r.jugador === nombreBot && r.producto === producto.nombre)
     .reduce((sum, r) => sum + Number(r.unidadesVendidas || 0), 0);
 
-  const cuotaBot = demandaTotalSegmento > 0
-    ? ventasBot / demandaTotalSegmento
-    : 0;
+  const cuotaBot = demandaTotalSegmento > 0 ? ventasBot / demandaTotalSegmento : 0;
 
-  const segmentoData = marketData.segmentos[segmento];
-  const porcentajeDemanda = segmentoData[`demandaAno${rondaActual + 1}`] ?? segmentoData.demandaAno1;
-  const demandaTeorica = segmentoData.usuariosPotenciales * (porcentajeDemanda / 100);
+  const segData = marketData.segmentos[segmento];
+  const pct = segData[`demandaAno${rondaActual + 1}`] ?? segData.demandaAno1;
+  const demandaTeorica = segData.usuariosPotenciales * (pct / 100);
 
-  const demandaEstimBot = demandaTeorica * cuotaBot;
-
-  // Logs de depuración (puedes silenciarlos en prod)
-  console.log(`📊 [Estimación Demanda] Producto: ${producto.nombre}`);
-  console.log(`   Segmento: ${segmento}`);
-  console.log(`   Ronda actual: ${rondaActual}`);
-  console.log(`   Demanda total del segmento en ronda ${rondaActual - 1}: ${demandaTotalSegmento}`);
-  console.log(`   Ventas del bot en ese segmento: ${ventasBot}`);
-  console.log(`   Cuota del bot: ${cuotaBot.toFixed(4)}`);
-  console.log(`   Usuarios potenciales: ${segmentoData.usuariosPotenciales}`);
-  console.log(`   Porcentaje demanda año ${rondaActual + 1}: ${porcentajeDemanda}`);
-  console.log(`   Demanda teórica: ${demandaTeorica}`);
-  console.log(`   → Demanda estimada para el bot: ${demandaEstimBot}`);
-
-  return Math.round(demandaEstimBot);
+  const demandaEstim = demandaTeorica * cuotaBot;
+  return Math.round(demandaEstim);
 }
 
 function decidirUnidadesAFabricar(producto, demandaEstimada, stockPrevio, dificultad, presupuestoWrapper) {
   const costeUnitario = producto.costeUnitarioEst || 1000;
   const deficit = Math.max(0, demandaEstimada - stockPrevio);
 
-  // Margen según dificultad
+  // Colchón según dificultad
   let margen = 0;
   if (dificultad === 'facil') margen = 0.20;
   if (dificultad === 'normal') margen = 0.10;
@@ -218,136 +182,90 @@ function decidirUnidadesAFabricar(producto, demandaEstimada, stockPrevio, dificu
   const unidadesPosibles = Math.floor(presupuestoWrapper.valor / costeUnitario);
 
   const unidadesFabricar = Math.min(unidadesDeseadas, unidadesPosibles);
-  const costeTotal = unidadesFabricar * costeUnitario;
-
-  presupuestoWrapper.valor -= costeTotal;
-
+  presupuestoWrapper.valor -= unidadesFabricar * costeUnitario;
   return unidadesFabricar;
 }
 
 function decidirPrecio(producto, segmento, resultadosAnteriores, dificultad) {
-  const funcionSensibilidad = segmento.funcionSensibilidad;
-  if (typeof funcionSensibilidad !== 'function') return 1000;
+  const fn = segmento.funcionSensibilidad;
+  if (typeof fn !== 'function') return 1000;
 
-  // Calcular interés del producto según sus características vs. el segmento
   const interesProducto = calcularInteresProductoParaSegmento(producto, segmento);
-
-  // Precio ideal según el segmento
   const precioIdeal = calcularPrecioOptimo(segmento);
 
-  // Buscar el mejor precio entre ±20%
-  const pasos = 20;
-  const minPrecio = precioIdeal * 0.8;
-  const maxPrecio = precioIdeal * 1.2;
-  let mejorPrecio = precioIdeal;
-  let mejorInteres = -Infinity;
+  const pasos = 20, minP = precioIdeal * 0.8, maxP = precioIdeal * 1.2;
+  let bestP = precioIdeal, bestScore = -Infinity;
 
   for (let i = 0; i <= pasos; i++) {
-    const precio = minPrecio + i * ((maxPrecio - minPrecio) / pasos);
-
-    const interesPrecio = calcularInteresPrecio(
-      { precioAjustado: precio },
-      funcionSensibilidad,
-      interesProducto
-    );
-
-    const interesTotal = interesProducto + interesPrecio;
-
-    if (interesTotal > mejorInteres) {
-      mejorInteres = interesTotal;
-      mejorPrecio = precio;
-    }
+    const p = minP + i * ((maxP - minP) / pasos);
+    const interesPrecio = calcularInteresPrecio({ precioAjustado: p }, fn, interesProducto);
+    const score = interesProducto + interesPrecio;
+    if (score > bestScore) { bestScore = score; bestP = p; }
   }
 
-  // Error según dificultad
   let error = 0;
   if (dificultad === 'facil')   error = (Math.random() * 0.20) - 0.10;
   if (dificultad === 'normal')  error = (Math.random() * 0.10) - 0.05;
   if (dificultad === 'dificil') error = (Math.random() * 0.04) - 0.02;
 
-  const precioFinal = mejorPrecio * (1 + error);
-
-  return Math.round(Math.max(100, precioFinal));
+  return Math.round(Math.max(100, bestP * (1 + error)));
 }
 
-// Calidad decidida en base al promedio ideal del segmento, con error según dificultad
+// Calidad (una sola versión, sin overrides)
 function decidirCalidadPorSegmento(segmentoObjetivo, marketData, dificultad) {
   const promedioIdeal = marketData.segmentos[segmentoObjetivo].productoIdeal.promedio || 5;
-
   let error = 0;
-  if (dificultad === 'facil')   error = (Math.random() * 0.15) - 0.075;  // ±7.5%
-  if (dificultad === 'normal')  error = (Math.random() * 0.10) - 0.05;   // ±5%
-  if (dificultad === 'dificil') error = (Math.random() * 0.05) - 0.025;  // ±2.5%
-
+  if (dificultad === 'facil')   error = (Math.random() * 0.15) - 0.075; // ±7.5%
+  if (dificultad === 'normal')  error = (Math.random() * 0.10) - 0.05;  // ±5%
+  if (dificultad === 'dificil') error = (Math.random() * 0.05) - 0.025; // ±2.5%
   const calidad = Math.round(promedioIdeal * (1 + error));
   return Math.max(1, Math.min(20, calidad));
 }
 
-// Posicionamiento basado en el precio óptimo del segmento
+// Posicionamiento por precio óptimo
 function decidirPosicionamientoPrecio(segmento, marketData) {
   const precioOptimo = calcularPrecioOptimo(segmento);
-  const posicionamiento = Math.round(precioOptimo / 50);  // 1000 → 20 aprox.
-  return Math.max(1, Math.min(20, posicionamiento));
+  const pos = Math.round(precioOptimo / 50);
+  return Math.max(1, Math.min(20, pos));
 }
 
 function decidirPublicidad(producto, resultadosAnteriores, presupuestoWrapper) {
   const nombre = producto.nombre;
-  let ventasAnteriores = 0;
-  let gastoAnterior = 0;
+  let ventasPrev = 0, gastoPrev = 0;
 
-  // Buscar el resultado del producto en la última ronda
-  const ultimaRonda = resultadosAnteriores[resultadosAnteriores.length - 1];
-  if (ultimaRonda && ultimaRonda.productos) {
-    const resultado = ultimaRonda.productos.find(p => p.producto === nombre);
-    if (resultado) {
-      ventasAnteriores = resultado.unidadesVendidas || 0;
-      gastoAnterior = resultado.publicidad || 0;
-    }
+  const ultima = resultadosAnteriores[resultadosAnteriores.length - 1];
+  if (ultima?.productos) {
+    const r = ultima.productos.find(p => p.producto === nombre);
+    if (r) { ventasPrev = r.unidadesVendidas || 0; gastoPrev = r.publicidad || 0; }
   }
 
-  let gastoPublicidad = 100000;
+  let gasto = 100000;
+  if (ventasPrev === 0) gasto = Math.min(50000, presupuestoWrapper.valor * 0.05);
+  else if (ventasPrev > 0 && gastoPrev > 0) gasto = Math.min(150000, gastoPrev * 1.2);
 
-  // Ajuste según histórico
-  if (ventasAnteriores === 0) {
-    gastoPublicidad = Math.min(50000, presupuestoWrapper.valor * 0.05);
-  } else if (ventasAnteriores > 0 && gastoAnterior > 0) {
-    gastoPublicidad = Math.min(150000, gastoAnterior * 1.2);
-  }
-
-  gastoPublicidad = Math.min(gastoPublicidad, presupuestoWrapper.valor);
-  presupuestoWrapper.valor -= gastoPublicidad;
-
-  return gastoPublicidad;
+  gasto = Math.min(gasto, presupuestoWrapper.valor);
+  presupuestoWrapper.valor -= gasto;
+  return gasto;
 }
 
 function decidirCanalesDistribucion(
-  productos,
-  presupuestoWrapper,
-  resultadosCache,
-  marketData,
-  dificultad,
-  nombreBot
+  productos, presupuestoWrapper, resultadosCache, marketData, dificultad, nombreBot
 ) {
   const canales = ['granDistribucion', 'minoristas', 'online', 'tiendaPropia'];
 
-  // 1) % de marketing
-  const minPct = 0.10;
-  const maxPct = 0.15;
-  const marketingPct = minPct + Math.random() * (maxPct - minPct);
+  // % de marketing
+  const marketingPct = 0.10 + Math.random() * 0.05; // 10–15%
   const presupuestoCanales = Math.min(Math.round(presupuestoWrapper.valor * marketingPct), presupuestoWrapper.valor);
 
-  // 2) Demanda del BOT por canal
+  // Demanda del BOT por canal (robusto a cache vacío)
+  const resultados = Array.isArray(resultadosCache) ? resultadosCache : [];
   const dem = canales.reduce((o, c) => (o[c] = 0, o), {});
-  (Array.isArray(resultadosCache) ? resultadosCache : [])
+  resultados
     .filter(r => r.jugador === nombreBot)
-    .forEach(r => {
-      if (dem[r.canal] !== undefined) {
-        dem[r.canal] += Number(r.unidadesVendidas || 0);
-      }
-    });
+    .forEach(r => { if (dem[r.canal] != null) dem[r.canal] += Number(r.unidadesVendidas || 0); });
   const sumDem = canales.reduce((s, c) => s + dem[c], 0) || 1;
 
-  // 3) Prioridad por canal desde los segmentos objetivo
+  // Prioridad por canales según segmentos objetivo
   const pri = canales.reduce((o, c) => (o[c] = 0, o), {});
   productos.forEach(p => {
     const prio = marketData.segmentos[p.segmentoObjetivo]?.prioridadCanales || {};
@@ -355,7 +273,7 @@ function decidirCanalesDistribucion(
   });
   const sumPri = canales.reduce((s, c) => s + pri[c], 0) || 1;
 
-  // 4) Score combinado
+  // Score combinado
   const pesoDem = 0.7, pesoPri = 0.3;
   const score = {};
   canales.forEach(c => {
@@ -364,11 +282,10 @@ function decidirCanalesDistribucion(
     score[c] = normDem * pesoDem + normPri * pesoPri;
   });
 
-  // 5) Normalizar score
+  // Normalizar
   const sumScore = canales.reduce((s, c) => s + score[c], 0) || 1;
   canales.forEach(c => score[c] /= sumScore);
 
-  // 6) Reparto inicial (en “unidades de presencia”)
   const costePorUnidad = {
     granDistribucion: 75000,
     minoristas: 115000,
@@ -382,211 +299,146 @@ function decidirCanalesDistribucion(
     unidadesPorCanal[c] = Math.floor(gasto / costePorUnidad[c]);
   });
 
-  // 7) Ajuste final
+  // Ajuste a presupuesto
   let gastoTotal = canales.reduce((s, c) => s + unidadesPorCanal[c] * costePorUnidad[c], 0);
   let diff = presupuestoCanales - gastoTotal;
-
   while (true) {
     let asignado = false;
     for (const canal of canales) {
       const coste = costePorUnidad[canal];
-      if (diff >= coste) {
-        unidadesPorCanal[canal]++;
-        diff -= coste;
-        asignado = true;
-      }
+      if (diff >= coste) { unidadesPorCanal[canal]++; diff -= coste; asignado = true; }
     }
     if (!asignado) break;
   }
 
-  // Restar del presupuesto global usado
-  const gastoFinal = canales.reduce((sum, c) => sum + unidadesPorCanal[c] * costePorUnidad[c], 0);
-  presupuestoWrapper.valor -= gastoFinal;
-
+  presupuestoWrapper.valor -= canales.reduce((sum, c) => sum + unidadesPorCanal[c] * costePorUnidad[c], 0);
   return unidadesPorCanal;
 }
 
-// ======================== FUNCIONES PRIMERA RONDA ==========================
+/* ======================== PRIMERA RONDA (extras) ======================== */
+
 function decidirProduccionPrimeraRonda(producto, presupuestoWrapper, segmentoObjetivo, marketData, dificultad) {
   const segmento = marketData.segmentos[segmentoObjetivo];
   const demanda = segmento.usuariosPotenciales * (segmento.demandaAno1 / 100);
   const cuotaEsperada = demanda / 3;
 
+  // ¡Corregido! error simétrico
   let error = 0;
-  if (dificultad === 'facil') error = (Math.random() * 0.15) - 0.5;
-  if (dificultad === 'normal') error = (Math.random() * 0.10) - 0.5;
-  if (dificultad === 'dificil') error = (Math.random() * 0.05) - 0.05;
+  if (dificultad === 'facil')   error = (Math.random() * 0.30) - 0.15; // ±15%
+  if (dificultad === 'normal')  error = (Math.random() * 0.20) - 0.10; // ±10%
+  if (dificultad === 'dificil') error = (Math.random() * 0.10) - 0.05; // ±5%
 
-  let unidadesObjetivo = Math.floor(cuotaEsperada * (1 + error));
+  const unidadesObjetivo = Math.max(0, Math.floor(cuotaEsperada * (1 + error)));
   const costeUnitario = producto.costeUnitarioEst || 1000;
   const maxUnidades = Math.floor(presupuestoWrapper.valor / costeUnitario);
 
   const unidadesFabricar = Math.min(unidadesObjetivo, maxUnidades);
-  const costeTotal = unidadesFabricar * costeUnitario;
-
-  presupuestoWrapper.valor -= costeTotal;
+  presupuestoWrapper.valor -= unidadesFabricar * costeUnitario;
 
   return unidadesFabricar;
 }
 
-function decidirCalidadPorSegmentoPrimeraRonda(segmentoObjetivo, marketData, dificultad) {
-  const promedioIdeal = marketData.segmentos[segmentoObjetivo].productoIdeal.promedio || 5;
-
-  let error = 0;
-  if (dificultad === 'facil') error = (Math.random() * 0.15 * 2) - 0.15;
-  if (dificultad === 'normal') error = (Math.random() * 0.10 * 2) - 0.10;
-  if (dificultad === 'dificil') error = (Math.random() * 0.05 * 2) - 0.05;
-
-  const calidad = Math.round(promedioIdeal * (1 + error));
-  return Math.max(1, Math.min(20, calidad));
-}
-
 function decidirPosicionamientoPrecioPrimeraRonda(segmentoObjetivo, marketData) {
   const precioOptimo = calcularPrecioOptimo(marketData.segmentos[segmentoObjetivo]);
-  const posicionamiento = Math.round(precioOptimo / 50);
-  return Math.max(1, Math.min(20, posicionamiento));
+  const pos = Math.round(precioOptimo / 50);
+  return Math.max(1, Math.min(20, pos));
 }
 
 function decidirPublicidadPrimeraRonda(presupuestoWrapper) {
-  const gastoPublicidad = Math.min(100000, presupuestoWrapper.valor);
-  presupuestoWrapper.valor -= gastoPublicidad;
-  return gastoPublicidad;
+  const gasto = Math.min(100000, presupuestoWrapper.valor);
+  presupuestoWrapper.valor -= gasto;
+  return gasto;
 }
 
 function decidirCanalesDistribucionPrimeraRonda(presupuestoWrapper) {
   const canales = ['granDistribucion', 'minoristas', 'online', 'tiendaPropia'];
-  const costeUnidad = {
-    granDistribucion: 75000,
-    minoristas: 115000,
-    online: 150000,
-    tiendaPropia: 300000
-  };
-
+  const costeUnidad = { granDistribucion: 75000, minoristas: 115000, online: 150000, tiendaPropia: 300000 };
   const unidades = {};
-  // Estrategia sencilla: distribuir igual entre canales hasta agotar
   canales.forEach(canal => {
     const coste = costeUnidad[canal];
     const unidadesPosibles = Math.floor(presupuestoWrapper.valor / coste);
-    const unidadesAsignadas = Math.min(unidadesPosibles, 10); // máx. 10 por canal por ahora
+    const unidadesAsignadas = Math.min(unidadesPosibles, 10);
     unidades[canal] = unidadesAsignadas;
     presupuestoWrapper.valor -= unidadesAsignadas * coste;
   });
-
   return unidades;
 }
 
-// ======================== AUXILIARES ==========================
+/* ======================== AUXILIARES ======================== */
+
 function calcularInteresProductoParaSegmento(producto, segmento) {
-  let interesTotal = 0;
-  let numCaracteristicas = 0;
-
-  for (const [caracteristica, valorIdeal] of Object.entries(segmento.productoIdeal || {})) {
-    const valorAjustado = parseFloat(producto.caracteristicasAjustadas?.[caracteristica]) || 0;
-
-    if (valorIdeal > 0) {
-      const excesoRelativo = valorAjustado / valorIdeal;
-      const umbral = 1.13;
-      const exp = 3.5;
-      const maxPremio = 10 * umbral;
-
+  let interesTotal = 0, num = 0;
+  for (const [car, ideal] of Object.entries(segmento.productoIdeal || {})) {
+    const valAdj = parseFloat(producto.caracteristicasAjustadas?.[car]) || 0;
+    if (ideal > 0) {
+      const exceso = valAdj / ideal, umbral = 1.13, exp = 3.5, maxPremio = 10 * umbral;
       let interes = 0;
-      if (excesoRelativo < 1) {
-        interes = 10 * Math.pow(excesoRelativo, exp);
-      } else if (excesoRelativo <= umbral) {
-        interes = 10 * excesoRelativo;
-      } else {
-        const desajuste = (excesoRelativo - umbral) / umbral;
+      if (exceso < 1)      interes = 10 * Math.pow(exceso, exp);
+      else if (exceso <= umbral) interes = 10 * exceso;
+      else {
+        const desajuste = (exceso - umbral) / umbral;
         const factor = Math.max(0, 1 - desajuste);
         interes = maxPremio * Math.pow(factor, exp);
       }
-
       interes = Math.max(0, parseFloat(interes.toFixed(2)));
-      interesTotal += interes;
-      numCaracteristicas++;
+      interesTotal += interes; num++;
     }
   }
-
-  return numCaracteristicas > 0
-    ? parseFloat((interesTotal / numCaracteristicas).toFixed(2))
-    : 0;
+  return num > 0 ? parseFloat((interesTotal / num).toFixed(2)) : 0;
 }
 
 function calcularInteresPrecio(producto, funcionSensibilidad, interesProducto) {
   const pa = producto.precioAjustado;
-  if (typeof pa !== "number" || isNaN(pa) || pa < 0) return 0;
-  if (typeof funcionSensibilidad !== "function") return 0;
-  if (typeof interesProducto !== "number" || isNaN(interesProducto) || interesProducto <= 0) return 0;
+  if (typeof pa !== 'number' || isNaN(pa) || pa < 0) return 0;
+  if (typeof funcionSensibilidad !== 'function') return 0;
+  if (typeof interesProducto !== 'number' || isNaN(interesProducto) || interesProducto <= 0) return 0;
 
-  const maxAjusteEuros = 30;
-  const maxAjustePorcentaje = 0.10;
-
+  const maxAjusteEuros = 30, maxAjustePct = 0.10;
   let factor = 10 / interesProducto;
-  factor = Math.max(1 - maxAjustePorcentaje, Math.min(factor, 1 + maxAjustePorcentaje));
+  factor = Math.max(1 - maxAjustePct, Math.min(factor, 1 + maxAjustePct));
 
   const precioAjustado = pa * factor;
-  const diferencia = precioAjustado - pa;
-  const diferenciaLimitada = Math.max(-maxAjusteEuros, Math.min(diferencia, maxAjusteEuros));
-
-  const precioPercibido = pa + diferenciaLimitada;
+  const diff = Math.max(-maxAjusteEuros, Math.min(precioAjustado - pa, maxAjusteEuros));
+  const precioPercibido = pa + diff;
   producto.precioPercibido = precioPercibido;
 
   const demanda = funcionSensibilidad(precioPercibido);
   const interes = Math.max(0, Math.min(10, demanda / 10));
-
   producto.interesPrecio = interes;
-
   return interes;
 }
 
 function asignarSegmentoPorProducto(producto, marketData) {
-  const segmentos = marketData.segmentos;
-  let mejorSegmento = null;
-  let menorDiferencia = Infinity;
-
-  for (const nombreSegmento in segmentos) {
-    const productoIdeal = segmentos[nombreSegmento].productoIdeal;
-    let diferenciaTotal = 0;
-
-    for (const caracteristica in productoIdeal) {
-      if (caracteristica === "promedio") continue;
-      const valorProducto = producto.caracteristicas?.[caracteristica] || 0;
-      const valorIdeal = productoIdeal[caracteristica];
-      diferenciaTotal += Math.abs(valorProducto - valorIdeal);
+  const segs = marketData.segmentos;
+  let mejor = null, menor = Infinity;
+  for (const nombre in segs) {
+    const ideal = segs[nombre].productoIdeal;
+    let d = 0;
+    for (const k in ideal) {
+      if (k === 'promedio') continue;
+      d += Math.abs((producto.caracteristicas?.[k] || 0) - ideal[k]);
     }
-
-    if (diferenciaTotal < menorDiferencia) {
-      menorDiferencia = diferenciaTotal;
-      mejorSegmento = nombreSegmento;
-    }
+    if (d < menor) { menor = d; mejor = nombre; }
   }
-
-  return mejorSegmento;
+  return mejor;
 }
 
 function calcularPrecioOptimo(segmento) {
   const fn = segmento.funcionSensibilidad;
-  let maxVentas = -Infinity;
-  let mejorPrecio = 0;
-
+  let maxVentas = -Infinity, mejorPrecio = 0;
   for (let precio = 100; precio <= 2000; precio += 10) {
     const ventas = fn(precio);
-    if (ventas > maxVentas) {
-      maxVentas = ventas;
-      mejorPrecio = precio;
-    }
+    if (ventas > maxVentas) { maxVentas = ventas; mejorPrecio = precio; }
   }
-
   return mejorPrecio;
 }
 
 function ajustarPrecioPorDificultad(precioOptimo, dificultad) {
   let error = 0;
-  if (dificultad === 'facil') error = (Math.random() * 0.2) - 0.10;
-  if (dificultad === 'normal') error = (Math.random() * 0.1) - 0.05;
+  if (dificultad === 'facil') error = (Math.random() * 0.20) - 0.10;
+  if (dificultad === 'normal') error = (Math.random() * 0.10) - 0.05;
   if (dificultad === 'dificil') error = (Math.random() * 0.04) - 0.02;
   return Math.max(50, Math.round(precioOptimo + (precioOptimo * error)));
 }
 
-module.exports = {
-  tomarDecisionesBot
-};
+module.exports = { tomarDecisionesBot };
