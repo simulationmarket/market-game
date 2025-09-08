@@ -238,7 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
       mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, idCanvas);
       mostrarTablaCanal(resultadosJugadorProducto, idTablaCanal);
 
-      // Para cuota, usamos TODOS los jugadores, filtrando por producto
+      // CUOTAS por producto:
+      //  - TOTAL = TODO el mercado (todos los productos y jugadores)
+      //  - JUGADOR = solo este producto del jugador
       mostrarCuotaPorSegmento(resultados, playerName, idCuotaSeg, producto);
       mostrarCuotaPorCanal(resultados,   playerName, idCuotaCan, producto);
     });
@@ -357,9 +359,12 @@ function mostrarGraficoEvolucion(roundsHistory) {
   });
 }
 
-// TOTAL = todos los jugadores (filtrando por producto si se indica).
-// JUGADOR = solo el jugador actual.
-// CUOTA = JUGADOR / TOTAL.
+// ====== CUOTAS ======
+// En vista por producto (cuando viene `productoFiltrado`):
+//   - TOTAL  = TODO el mercado (todos los productos y jugadores) por segmento/canal.
+//   - JUGADOR = SOLO el producto filtrado del jugador.
+// En vista general (sin `productoFiltrado`):
+//   - TOTAL y JUGADOR se calculan sobre todo lo que corresponda (todos los productos).
 function mostrarCuotaPorSegmento(_ignored, playerName, idDiv, productoFiltrado = null) {
   const rowsAll = window.__VENTAS_ALL || _ignored || [];
   const totales = {}, jugador = {};
@@ -371,11 +376,12 @@ function mostrarCuotaPorSegmento(_ignored, playerName, idDiv, productoFiltrado =
     const producto = _rowProducto(row);
     const uds      = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
 
-    if (!productoFiltrado || producto === productoFiltrado) {
-      totales[segmento] = (totales[segmento] || 0) + uds; // TODOS los jugadores
-    }
+    // TOTAL = todo el mercado (ignora productoFiltrado)
+    totales[segmento] = (totales[segmento] || 0) + uds;
+
+    // JUGADOR = si hay productoFiltrado, solo ese producto; si no, todos los suyos
     if (_norm(nombre) === _norm(playerName) && (!productoFiltrado || producto === productoFiltrado)) {
-      jugador[segmento] = (jugador[segmento] || 0) + uds; // mi jugador
+      jugador[segmento] = (jugador[segmento] || 0) + uds;
     }
   });
 
@@ -402,11 +408,12 @@ function mostrarCuotaPorCanal(_ignored, playerName, idDiv, productoFiltrado = nu
     const producto = _rowProducto(row);
     const uds      = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
 
-    if (!productoFiltrado || producto === productoFiltrado) {
-      totales[canal] = (totales[canal] || 0) + uds; // TODOS los jugadores
-    }
+    // TOTAL = todo el mercado (ignora productoFiltrado)
+    totales[canal] = (totales[canal] || 0) + uds;
+
+    // JUGADOR = si hay productoFiltrado, solo ese producto; si no, todos los suyos
     if (_norm(nombre) === _norm(playerName) && (!productoFiltrado || producto === productoFiltrado)) {
-      jugador[canal] = (jugador[canal] || 0) + uds; // mi jugador
+      jugador[canal] = (jugador[canal] || 0) + uds;
     }
   });
 
@@ -443,3 +450,4 @@ function mostrarTablaCanal(resultados, idDiv) {
     `).join("")
   }</tbody></table>`;
 }
+
