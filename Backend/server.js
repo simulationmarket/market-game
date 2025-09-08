@@ -206,6 +206,71 @@ app.get('/db/peek/:codigo', async (req, res) => {
   }
 });
 
+// 📜 Últimos registros (decisiones y resultados) para depurar
+app.get('/db/ultimas/:codigo', async (req, res) => {
+  try {
+    const { codigo } = req.params;
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 10)); // 1..50
+
+    const partida = await prisma.partida.findUnique({
+      where: { codigo },
+      select: { id: true, codigo: true }
+    });
+    if (!partida) return res.status(404).json({ ok: false, error: 'Partida no encontrada' });
+
+    // Decisiones más recientes
+    const decisiones = await prisma.decision.findMany({
+      where: { partidaId: partida.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        createdAt: true,
+        data: true,
+        jugador: { select: { nombre: true, esBot: true } },
+        ronda: { select: { numero: true } }
+      }
+    });
+
+    // Resultados de ronda más recientes
+    const resultados = await prisma.resultadoRonda.findMany({
+      where: { partidaId: partida.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        createdAt: true,
+        ronda: { select: { numero: true } }
+        // ⚠️ omitimos data (puede ser grande). Si la quieres, añade: data: true
+      }
+    });
+
+    // Formato limpio (fechas como ISO)
+    const toIso = d => (d instanceof Date ? d.toISOString() : d);
+    const decisionesFmt = decisiones.map(d => ({
+      jugador: d.jugador?.nombre,
+      esBot: !!d.jugador?.esBot,
+      ronda: d.ronda?.numero ?? null,
+      createdAt: toIso(d.createdAt),
+      // pequeño resumen del JSON guardado
+      resumen: {
+        tieneProducts: Array.isArray(d.data?.products),
+        nProducts: Array.isArray(d.data?.products) ? d.data.products.length : 0,
+        tieneCanales: !!d.data?.canalesDistribucion
+      }
+    }));
+
+    const resultadosFmt = resultados.map(r => ({
+      ronda: r.ronda?.numero ?? null,
+      createdAt: toIso(r.createdAt)
+    }));
+
+    res.json({ ok: true, codigo, decisiones: decisionesFmt, resultados: resultadosFmt });
+  } catch (e) {
+    console.error('[DB ULTIMAS] Error:', e);
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // ====== API ======
 app.use('/api', playerRoutes);
 
