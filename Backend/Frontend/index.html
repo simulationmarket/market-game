@@ -19,29 +19,15 @@
     #copyLink { background:#8e44ad; color:white; }
     .status-text { margin-top:.5rem; }
     .container { max-width: 680px; margin:6vh auto; display:flex; flex-direction:column; gap:12px; text-align:center; }
-    .logo { width:160px; margin:0 auto 12px; }
-    /* Log grande y a todo el ancho del recuadro */
-    #log {
-      width: 100%;
-      min-height: 180px;
-      max-height: 320px;
-      overflow: auto;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      padding: 12px 14px;
-      text-align: left;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      font-size: 15px;
-      line-height: 1.45;
-      box-sizing: border-box;
-    }
-    #log p { margin: 0 0 6px; white-space: pre-wrap; word-break: break-word; }
+    /* el tamaño final del logo lo controla también index.css, esto refuerza */
+    .logo { width:100%; max-height:320px; margin:0 auto 12px; display:block; object-fit:contain; }
   </style>
 </head>
 <body>
   <div class="container fade-in">
-    <img src="logo.png" alt="Logo del juego" class="logo" />
+    <!-- OJO: nombre correcto del archivo con mayúscula -->
+    <img src="Logo.png" alt="Logo del juego" class="logo" />
+
     <h1>Bienvenido al Juego de Simulación de Mercado</h1>
 
     <label for="playerName">Nombre de la Empresa</label>
@@ -58,9 +44,6 @@
     <button id="readyButton">Estoy Listo</button>
     <div id="status" class="status-text"></div>
     <div id="temporizador" class="status-text" style="margin-top: 10px;"></div>
-
-    <h3 style="margin:14px 0 6px; text-align:left;">Log</h3>
-    <div id="log" aria-live="polite"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

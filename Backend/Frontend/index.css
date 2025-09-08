@@ -16,12 +16,16 @@ body {
   border-radius: 15px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
   width: 90%;
-  max-width: 400px; /* Será sobrescrito por el estilo inline del HTML (680px) */
+  max-width: 680px; /* ampliamos el recuadro */
 }
 
+/* Logo grande, ocupa todo el ancho del recuadro */
 .logo {
-  width: 160px;
-  margin-bottom: 10px;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  margin: 0 auto 14px;
+  display: block;
 }
 
 label, input, button {
