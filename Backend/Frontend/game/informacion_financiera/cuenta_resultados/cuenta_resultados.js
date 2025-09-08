@@ -27,9 +27,8 @@
 
     socket.on('connect', () => {
       console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
-      // ✅ así SÍ (igual que Productos/Estudios)
-      socket.emit('joinGame', { partidaId, nombre: playerName }); // usa 'nombre'
-      socket.emit('identificarJugador', playerName);               // envía STRING
+      socket.emit('joinGame', { partidaId, nombre: playerName });
+      socket.emit('identificarJugador', playerName);
       socket.emit('solicitarResultados', { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
     });
@@ -46,19 +45,19 @@
 
     socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
 
-socket.on('resultadosCompletos', (payload) => {
-  console.log('[CR-GENERAL] resultadosCompletos', payload);
-  if (payload?.roundsHistory) {
-    roundsHistory = payload.roundsHistory;
-    render();
-  }
-});
+    socket.on('resultadosCompletos', (payload) => {
+      console.log('[CR-GENERAL] resultadosCompletos', payload);
+      if (payload?.roundsHistory) {
+        roundsHistory = payload.roundsHistory;
+        render();
+      }
+    });
 
     function render() {
       if (!Array.isArray(roundsHistory) || roundsHistory.length === 0) return;
       generarEstructuraTabla(roundsHistory);
       actualizarTabla(roundsHistory);
-      actualizarGrafico(roundsHistory);
+      actualizarGrafico(roundsHistory); // <- ahora columnas apiladas por ronda
     }
 
     function formatPartidaName(partida) {
@@ -137,21 +136,31 @@ socket.on('resultadosCompletos', (payload) => {
       });
     }
 
+    // ---- NUEVO: helper para publicidad por ronda ----
+    function gastoPublicidadRonda(r) {
+      if (r?.decisiones?.products?.length) {
+        return r.decisiones.products.reduce((acc, p) => acc + (Number(p.presupuestoPublicidad) || 0), 0);
+      }
+      return 0;
+    }
+
     function actualizarGrafico(hist) {
       const canvas = document.getElementById('gastosPorcentajeChart');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
 
       const etiquetas = hist.map((_, i) => `R${i + 1}`);
-      const pct = (num, den) => (den ? ((num / den) * 100).toFixed(2) : 0);
+      const pct = (num, den) => den ? +( (num / den) * 100 ).toFixed(2) : 0;
 
-      const costesVentas     = hist.map(d => pct(d.costeVentas,     d.facturacionNeta));
-      const gastosOperativos = hist.map(d => pct(d.gastosOperativos,d.facturacionNeta));
-      const gastosComerciales= hist.map(d => pct(d.gastosComerciales,d.facturacionNeta));
-      const costeAlmacenaje  = hist.map(d => pct(d.costeAlmacenaje, d.facturacionNeta));
-      const gastosFinancieros= hist.map(d => pct(d.gastosFinancieros,d.facturacionNeta));
-      const impuestos        = hist.map(d => pct(d.impuestos,       d.facturacionNeta));
-      const resultadoNeto    = hist.map(d => pct(d.resultadoNeto,   d.facturacionNeta));
+      // % sobre facturación neta (vertical)
+      const costesVentas      = hist.map(d => pct(d.costeVentas,       d.facturacionNeta));
+      const gastosPublicidad  = hist.map(d => pct(gastoPublicidadRonda(d), d.facturacionNeta));
+      const gastosOperativos  = hist.map(d => pct(d.gastosOperativos,  d.facturacionNeta));
+      const gastosComerciales = hist.map(d => pct(d.gastosComerciales, d.facturacionNeta));
+      const costeAlmacenaje   = hist.map(d => pct(d.costeAlmacenaje,   d.facturacionNeta));
+      const gastosFinancieros = hist.map(d => pct(d.gastosFinancieros, d.facturacionNeta));
+      const impuestos         = hist.map(d => pct(d.impuestos,         d.facturacionNeta));
+      const resultadoNeto     = hist.map(d => pct(d.resultadoNeto,     d.facturacionNeta));
 
       if (window.financialChart) window.financialChart.destroy();
 
@@ -161,6 +170,7 @@ socket.on('resultadosCompletos', (payload) => {
           labels: etiquetas,
           datasets: [
             { label: 'Costes de Ventas',     data: costesVentas,      backgroundColor: 'rgba(54,162,235,0.7)' },
+            { label: 'Gastos de Publicidad', data: gastosPublicidad,  backgroundColor: 'rgba(255,206,86,0.7)' },
             { label: 'Gastos Operativos',    data: gastosOperativos,  backgroundColor: 'rgba(75,192,192,0.7)' },
             { label: 'Gastos Comerciales',   data: gastosComerciales, backgroundColor: 'rgba(200,200,200,0.7)' },
             { label: 'Almacenaje',           data: costeAlmacenaje,   backgroundColor: 'rgba(150,150,255,0.7)' },
@@ -169,7 +179,27 @@ socket.on('resultadosCompletos', (payload) => {
             { label: 'Resultado Neto',       data: resultadoNeto,     backgroundColor: 'rgba(255,159,64,0.7)' }
           ]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              max: 100,
+              ticks: { callback: (v) => v + '%' }
+            }
+          }
+        }
       });
     }
   });
