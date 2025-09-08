@@ -1,5 +1,7 @@
 // server.js (Koyeb-ready, multipartida)
 // -------------------------------------------------
+const { prisma } = require('./prisma');
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');

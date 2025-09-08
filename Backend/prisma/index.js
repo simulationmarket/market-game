@@ -24,17 +24,6 @@ if (isProd) {
   });
 }
 
-// Middleware de consultas lentas (umbral configurable)
-const SLOW_MS = Number(process.env.PRISMA_SLOW_MS || 400);
-prisma.$use(async (params, next) => {
-  const t0 = Date.now();
-  const result = await next(params);
-  const dt = Date.now() - t0;
-  if (dt > SLOW_MS) {
-    console.warn(`[Prisma][lento ${dt}ms] ${params.model}.${params.action}`);
-  }
-  return result;
-});
 
 // Desconexión limpia si el proceso termina sin pasar por tu shutdown
 process.on('beforeExit', async () => {

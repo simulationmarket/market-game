@@ -8,16 +8,18 @@ datasource db {
 }
 
 model Partida {
-  id          String    @id @default(cuid())
-  codigo      String    @unique
-  estado      String
-  rondaActual Int       @default(0)
-  createdAt   DateTime  @default(now())
+  id          String   @id @db.Text @default(dbgenerated("gen_random_uuid()"))
+  codigo      String   @db.Text @unique @default(dbgenerated("encode(gen_random_bytes(6), 'hex'::text)"))
+  estado      String   @db.Text @default("lobby")
+  rondaActual Int      @default(0)
+  createdAt   DateTime @default(now())
 
   jugadores   Jugador[]
   rondas      Ronda[]
   decisiones  Decision[]
   resultados  ResultadoRonda[]
+
+  @@map("Partida")
 }
 
 model Jugador {
