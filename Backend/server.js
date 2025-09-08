@@ -218,6 +218,32 @@ app.get('/db/test', async (req, res) => {
   }
 });
 
+// 👀 Verificación rápida de la partida en BD
+app.get('/db/peek/:codigo', async (req, res) => {
+  try {
+    const { codigo } = req.params;
+
+    const partida = await prisma.partida.findUnique({
+      where: { codigo },
+      select: { id: true, codigo: true }
+    });
+    if (!partida) {
+      return res.status(404).json({ ok: false, error: 'Partida no encontrada' });
+    }
+
+    const [jugadores, rondas, decisiones, resultados] = await Promise.all([
+      prisma.jugador.count({ where: { partidaId: partida.id } }),
+      prisma.ronda.count({ where: { partidaId: partida.id } }),
+      prisma.decision.count({ where: { partidaId: partida.id } }),
+      prisma.resultadoRonda.count({ where: { partidaId: partida.id } })
+    ]);
+
+    res.json({ ok: true, codigo, jugadores, rondas, decisiones, resultados });
+  } catch (e) {
+    console.error('[DB PEEK] Error:', e);
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
 
 // ====== API ======
 app.use('/api', playerRoutes);
