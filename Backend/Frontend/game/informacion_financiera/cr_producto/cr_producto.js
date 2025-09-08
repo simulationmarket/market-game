@@ -26,18 +26,36 @@
     // buffers de diagnóstico
     window.__sockCRP = socket;
 
+    // ===== DIAGNÓSTICO GLOBAL: loguea TODO lo que llega =====
+    try {
+      socket.onAny?.((event, ...args) => {
+        if (['ping','pong','connect','disconnect'].includes(event)) return;
+        const head = args?.[0];
+        const sample = Array.isArray(head) ? head.slice(0,1) : head;
+        console.debug(LOG, 'onAny <-', event, { sample, extraCount: args.length - 1 });
+      });
+    } catch {}
+
     let roundsHistory = [];
     let resultados = [];
     let gotSync = false;
     let gotRes  = false;
 
     const norm = s => String(s ?? '').trim().toLowerCase();
+    const n = v => Number(v) || 0;
+
+    // Campos alternativos para nombre de jugador y producto
+    const getRowPlayer = (row={}) =>
+      row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre ?? row.player ?? row.playerName ?? row.company;
+
+    const getRowProducto = (row={}) =>
+      row.producto ?? row.product ?? row.nombreProducto ?? row.productName;
+
     const matchesPlayer = (row, name) => {
-      const a = norm(row?.jugador ?? row?.empresa ?? row?.nombreJugador ?? row?.jugadorNombre ?? row?.player ?? row?.playerName ?? row?.company);
+      const a = norm(getRowPlayer(row));
       const b = norm(name);
       return a === b || a.includes(b) || b.includes(a);
     };
-    const n = v => Number(v) || 0;
 
     const maybeRender = () => { if (gotSync && gotRes) tryRender(); };
 
@@ -47,11 +65,13 @@
       socket.emit('identificarJugador', playerName); // STRING
       socket.emit('solicitarResultados',          { partidaId, playerName });
       socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+      // reintento por si el backend espera un poco
+      setTimeout(() => socket.emit('solicitarResultadosCompletos', { partidaId, playerName }), 1500);
     });
 
     socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
-    // roundsHistory del jugador (para decisiones, gastos financieros/comerciales del jugador)
+    // roundsHistory del jugador
     function handleSync(d = {}) {
       roundsHistory = Array.isArray(d.roundsHistory) ? d.roundsHistory : [];
       window.__roundsHistory = roundsHistory; // buffer
@@ -62,18 +82,35 @@
     socket.on('syncPlayerData', handleSync);
     socket.on('syncJugador',    handleSync);
 
-    // resultados completos (todas las filas de ventas con partidas ya calculadas)
+    // resultados completos (todas las filas)
+    function extractResultados(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== 'object') return [];
+      // prueba varias claves comunes
+      const candidates = [
+        'resultados', 'resultadosCompletos', 'data', 'rows', 'ventas', 'items', 'list'
+      ];
+      for (const k of candidates) {
+        if (Array.isArray(payload[k])) return payload[k];
+      }
+      // a veces viene { ok:true, data:{ rows:[...] } }
+      if (payload.data && typeof payload.data === 'object') {
+        for (const k of candidates) {
+          if (Array.isArray(payload.data[k])) return payload.data[k];
+        }
+      }
+      return [];
+    }
+
     function handleResultados(payload) {
-      resultados = Array.isArray(payload) ? payload
-                : (Array.isArray(payload?.resultados) ? payload.resultados : []);
+      resultados = extractResultados(payload);
       window.__ultimosResultados = resultados; // buffer para inspección
       gotRes = true;
       console.log(LOG, 'resultadosCompletos filas:', resultados.length);
-
       if (resultados.length) {
         const demo = resultados.slice(0, 3).map(r => ({
-          jugador: r.jugador,
-          producto: r.producto,
+          jugador: getRowPlayer(r),
+          producto: getRowProducto(r),
           facturacionBruta: r.facturacionBruta,
           facturacionNeta:  r.facturacionNeta,
           costeVentasProducto: r.costeVentasProducto,
@@ -85,9 +122,12 @@
       maybeRender();
     }
     socket.on('resultadosCompletos', handleResultados);
+    // por si el backend usa otro nombre
+    socket.on('resultados', handleResultados);
+    socket.on('ventasCompletas', handleResultados);
 
     function tryRender() {
-      if (!playerName) return;
+      if (!playerName) { emptyState('Falta playerName en la URL o localStorage.'); return; }
 
       // 1) Filas del jugador
       let filas = resultados.filter(r => matchesPlayer(r, playerName));
@@ -96,7 +136,7 @@
       const last = roundsHistory[roundsHistory.length - 1];
       if (filas.length === 0 && last?.decisiones?.products?.length) {
         const mySet = new Set((last.decisiones.products || []).map(p => norm(p?.nombre)).filter(Boolean));
-        filas = resultados.filter(r => mySet.has(norm(r.producto)));
+        filas = resultados.filter(r => mySet.has(norm(getRowProducto(r))));
       }
 
       if (filas.length === 0) {
@@ -135,7 +175,7 @@
         resultadoNeto:    0
       };
 
-      // Mapa de publicidad por NOMBRE de producto (más robusto que por índice)
+      // Mapa de publicidad por NOMBRE de producto
       const pubMap = {};
       const prodList = roundData?.decisiones?.products || [];
       prodList.forEach(p => {
@@ -144,7 +184,7 @@
 
       // Agrupar y sumar partidas ya calculadas por el backend
       filasJugador.forEach(r => {
-        const prodName = r.producto;
+        const prodName = getRowProducto(r);
         if (!prodName) return;
 
         const key = prodName;
@@ -193,31 +233,25 @@
         totJugador.gastosPublicidad += c.gastosPublicidad;
       });
 
-      // Gastos comerciales del jugador:
-      // si roundData trae los del jugador, úsalo; si no, aproxima por proporción contra bruta global de la ronda
-      const gcRondaJugador = n(roundData?.gastosComerciales);
-      let gastosComercialesJugador = gcRondaJugador;
+      // Gastos comerciales del jugador: si no vienen claros, prorratear
+      const brutaJugador = totJugador.facturacionBruta || 0;
+      const gcGlobal = n(roundData?.gastosComerciales);
+      let gastosComercialesJugador = n(roundData?.gastosComercialesJugador);
       if (!gastosComercialesJugador) {
         const brutaGlobal = n(roundData?.facturacionBruta);
-        const brutaJugador = totJugador.facturacionBruta;
-        const gcGlobal = n(roundData?.gastosComerciales);
         gastosComercialesJugador = (brutaGlobal > 0 && brutaJugador > 0) ? (gcGlobal * (brutaJugador / brutaGlobal)) : 0;
       }
-
-      // Reparto de comerciales entre productos por peso en bruta del jugador
-      const brutaJugador = totJugador.facturacionBruta || 0;
       Object.values(porProducto).forEach(c => {
         const pct = brutaJugador > 0 ? (c.facturacionBruta / brutaJugador) : 0;
         c.gastosComerciales = gastosComercialesJugador * pct;
         totJugador.gastosComerciales += c.gastosComerciales;
       });
 
-      // Gastos financieros del jugador (si el round los trae, prorrateamos igual)
-      const gfJugador = n(roundData?.gastosFinancieros);
+      // Gastos financieros (prorrateo si vienen a nivel jugador/ronda)
+      const gfJugador = n(roundData?.gastosFinancieros ?? roundData?.costesFinancieros);
       Object.values(porProducto).forEach(c => {
         const pct = brutaJugador > 0 ? (c.facturacionBruta / brutaJugador) : 0;
         c.gastosFinancieros = gfJugador * pct;
-        // totJugador.gastosFinancieros += c.gastosFinancieros; // opcional sumatorio
       });
 
       // Métricas derivadas por producto

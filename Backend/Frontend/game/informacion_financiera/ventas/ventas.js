@@ -44,11 +44,20 @@ const chartsSegmentoPorId = {};
 
 // --- Helpers de filtrado ---
 const _norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// campos alternativos: ahora incluye player/playerName/company
+const _rowPlayer = (row={}) =>
+  row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre ?? row.player ?? row.playerName ?? row.company;
+
+const _rowProducto = (row={}) =>
+  row.producto ?? row.product ?? row.nombreProducto ?? row.productName;
+
 const _matchRowByPlayer = (row, playerName) => {
-  const c = _norm(row.jugador ?? row.empresa ?? row.nombreJugador ?? row.jugadorNombre);
+  const c = _norm(_rowPlayer(row));
   const p = _norm(playerName);
   return c === p || c.includes(p) || p.includes(c);
 };
+
 const _myProductSet = (roundsHistory) => {
   const last = roundsHistory?.[roundsHistory.length - 1];
   const prods = (last?.decisiones?.products || []).map(p => p?.nombre).filter(Boolean);
@@ -73,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // === Igual que Productos/Estudios: mismo origen, path /socket.io y WS+polling ===
   const socket = io('/', {
     path: '/socket.io',
     transports: ['websocket', 'polling'],
@@ -82,6 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
     reconnectionAttempts: Infinity,
     timeout: 20000
   });
+
+  // ===== DIAGNÓSTICO GLOBAL: loguea TODO lo que llega =====
+  try {
+    socket.onAny?.((event, ...args) => {
+      if (['ping','pong','connect','disconnect'].includes(event)) return;
+      const head = args?.[0];
+      const sample = Array.isArray(head) ? head.slice(0,1) : head;
+      console.debug(LOG, 'onAny <-', event, { sample, extraCount: args.length - 1 });
+    });
+  } catch {}
 
   let roundsHistory = [];
   let resultados = [];
@@ -92,11 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   socket.on('connect', () => {
     console.log(LOG, 'WS OK', { id: socket.id, partidaId, playerName });
-    // Orden recomendado (como en Productos)
     socket.emit('joinGame', { partidaId, nombre: playerName });
     socket.emit('identificarJugador', playerName); // STRING
     socket.emit('solicitarResultados',          { partidaId, playerName });
     socket.emit('solicitarResultadosCompletos', { partidaId, playerName });
+    setTimeout(() => socket.emit('solicitarResultadosCompletos', { partidaId, playerName }), 1500);
   });
   socket.on('connect_error', e => console.error(LOG, 'connect_error', e?.message || e));
 
@@ -111,14 +129,31 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('syncJugador',    handleSync);
 
   // Resultados completos (filas de ventas por producto/segmento/canal)
+  function extractResultados(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+    const candidates = ['resultados','resultadosCompletos','data','rows','ventas','items','list'];
+    for (const k of candidates) {
+      if (Array.isArray(payload[k])) return payload[k];
+    }
+    if (payload.data && typeof payload.data === 'object') {
+      for (const k of candidates) {
+        if (Array.isArray(payload.data[k])) return payload.data[k];
+      }
+    }
+    return [];
+  }
+
   function handleResultados(payload) {
-    resultados = Array.isArray(payload) ? payload
-              : (Array.isArray(payload?.resultados) ? payload.resultados : []);
+    resultados = extractResultados(payload);
     gotRes = true;
     console.log(LOG, 'resultadosCompletos filas:', resultados.length);
+    window.__VENTAS_debug = { resultadosSample: resultados.slice(0,3) };
     maybeRender();
   }
   socket.on('resultadosCompletos', handleResultados);
+  socket.on('resultados',          handleResultados);
+  socket.on('ventasCompletas',     handleResultados);
 
   function tryRender() {
     // 1) Filas del jugador
@@ -127,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2) Si no hay, usa productos del jugador según última ronda
     if (ventasJugador.length === 0) {
       const mySet = _myProductSet(roundsHistory);
-      ventasJugador = resultados.filter(r => mySet.has(_norm(r.producto)));
+      ventasJugador = resultados.filter(r => mySet.has(_norm(_rowProducto(r))));
     }
 
     // 3) Si sigue sin haber, limpiar y salir
@@ -144,33 +179,38 @@ document.addEventListener('DOMContentLoaded', () => {
     mostrarCuotaPorCanal(resultados, playerName, "tabla-cuota-canal");
 
     // --- Por producto ---
-    const productosUnicos = [...new Set(ventasJugador.map(r => r.producto))];
+    const productosUnicos = [...new Set(ventasJugador.map(r => _rowProducto(r)).filter(Boolean))];
     const contenedor = document.getElementById("contenedor-productos");
     if (contenedor) contenedor.innerHTML = '';
 
     productosUnicos.forEach(producto => {
       const div = document.createElement("div");
       div.classList.add("bloque-individual");
+      const idCanvas = `ventasSegmento-${producto}`;
+      const idTablaCanal = `tablaCanal-${producto}`;
+      const idCuotaSeg = `cuotaSegmento-${producto}`;
+      const idCuotaCan = `cuotaCanal-${producto}`;
+
       div.innerHTML = `
         <h2>${producto}</h2>
-        <canvas id="ventasSegmento-${producto}"></canvas>
-        <div id="tablaCanal-${producto}"></div>
-        <div id="cuotaSegmento-${producto}"></div>
-        <div id="cuotaCanal-${producto}"></div>
+        <canvas id="${idCanvas}"></canvas>
+        <div id="${idTablaCanal}"></div>
+        <div id="${idCuotaSeg}"></div>
+        <div id="${idCuotaCan}"></div>
       `;
       contenedor.appendChild(div);
 
       const resultadosJugadorProducto = resultados.filter(r =>
-        (_matchRowByPlayer(r, playerName)) && r.producto === producto
+        (_matchRowByPlayer(r, playerName)) && _rowProducto(r) === producto
       );
 
       // Datos del jugador para ventas
-      mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, `ventasSegmento-${producto}`);
-      mostrarTablaCanal(resultadosJugadorProducto, `tablaCanal-${producto}`);
+      mostrarGraficoVentasPorSegmento(resultadosJugadorProducto, idCanvas);
+      mostrarTablaCanal(resultadosJugadorProducto, idTablaCanal);
 
       // Todos para cuota, filtrando por producto del jugador
-      mostrarCuotaPorSegmento(resultados, playerName, `cuotaSegmento-${producto}`, producto);
-      mostrarCuotaPorCanal(resultados,   playerName, `cuotaCanal-${producto}`,   producto);
+      mostrarCuotaPorSegmento(resultados, playerName, idCuotaSeg, producto);
+      mostrarCuotaPorCanal(resultados,   playerName, idCuotaCan, producto);
     });
   }
 
@@ -199,12 +239,13 @@ function mostrarTablaPorProductoYCanal(resultados) {
   if (!contenedor) return;
 
   const agrupado = {};
-  resultados.forEach(({ canal, facturacionNeta, unidadesNetas, unidadesVendidas }) => {
+  resultados.forEach((row) => {
+    const canal = row.canal;
     if (!canal) return;
     if (!agrupado[canal]) agrupado[canal] = { canal, unidades: 0, ingresos: 0 };
-    const uds = Number(unidadesNetas ?? unidadesVendidas) || 0;
+    const uds = Number(row.unidadesNetas ?? row.unidadesVendidas) || 0;
     agrupado[canal].unidades += uds;
-    agrupado[canal].ingresos += Number(facturacionNeta) || 0;
+    agrupado[canal].ingresos += Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || 0;
   });
 
   const tabla = `<table><thead><tr>
@@ -226,9 +267,11 @@ function mostrarGraficoVentasPorSegmento(resultados, idCanvas) {
   if (chartsSegmentoPorId[idCanvas]) chartsSegmentoPorId[idCanvas].destroy();
 
   const agrupado = {};
-  resultados.forEach(({ segmento, unidadesVendidas }) => {
-    if (!segmento || isNaN(unidadesVendidas)) return;
-    agrupado[segmento] = (agrupado[segmento] || 0) + Number(unidadesVendidas);
+  resultados.forEach((row) => {
+    const segmento = row.segmento;
+    if (!segmento) return;
+    const uds = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
+    agrupado[segmento] = (agrupado[segmento] || 0) + uds;
   });
 
   const segmentos = Object.keys(agrupado);
@@ -264,9 +307,8 @@ function mostrarGraficoEvolucion(roundsHistory) {
   if (!c) return;
   const ctx = c.getContext("2d");
 
-  // labels por índice o por campo round si existe
   const labels = roundsHistory.map((r, i) => ('round' in r ? `Ronda ${Number(r.round)+1}` : `Ronda ${i + 1}`));
-  const datos  = roundsHistory.map(r => Number(r.facturacionNeta) || 0);
+  const datos  = roundsHistory.map(r => Number(r.facturacionNeta ?? r.ingresos ?? r.facturacion) || 0);
 
   chartEvolucionVentas?.destroy();
   chartEvolucionVentas = new Chart(ctx, {
@@ -285,9 +327,13 @@ function mostrarGraficoEvolucion(roundsHistory) {
 
 function mostrarCuotaPorSegmento(resultados, playerName, idDiv, productoFiltrado = null) {
   const totales = {}, jugador = {};
-  resultados.forEach(({ segmento, jugador: nombre, unidadesVendidas, producto }) => {
-    if (!segmento || isNaN(unidadesVendidas)) return;
-    const uds = Number(unidadesVendidas) || 0;
+  resultados.forEach((row) => {
+    const segmento = row.segmento;
+    if (!segmento) return;
+    const nombre = _rowPlayer(row);
+    const producto = _rowProducto(row);
+    const uds = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
+
     totales[segmento] = (totales[segmento] || 0) + uds;
     if (_norm(nombre) === _norm(playerName) && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[segmento] = (jugador[segmento] || 0) + uds;
@@ -308,9 +354,13 @@ function mostrarCuotaPorSegmento(resultados, playerName, idDiv, productoFiltrado
 
 function mostrarCuotaPorCanal(resultados, playerName, idDiv, productoFiltrado = null) {
   const totales = {}, jugador = {};
-  resultados.forEach(({ canal, jugador: nombre, unidadesVendidas, producto }) => {
-    if (!canal || isNaN(unidadesVendidas)) return;
-    const uds = Number(unidadesVendidas) || 0;
+  resultados.forEach((row) => {
+    const canal = row.canal;
+    if (!canal) return;
+    const nombre = _rowPlayer(row);
+    const producto = _rowProducto(row);
+    const uds = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
+
     totales[canal] = (totales[canal] || 0) + uds;
     if (_norm(nombre) === _norm(playerName) && (!productoFiltrado || producto === productoFiltrado)) {
       jugador[canal] = (jugador[canal] || 0) + uds;
@@ -333,12 +383,13 @@ function mostrarTablaCanal(resultados, idDiv) {
   if (!contenedor) return;
 
   const agrupado = {};
-  resultados.forEach(({ canal, facturacionNeta, unidadesVendidas, unidadesNetas }) => {
+  resultados.forEach((row) => {
+    const canal = row.canal;
     if (!canal) return;
     agrupado[canal] = agrupado[canal] || { unidades: 0, ingresos: 0 };
-    const uds = Number(unidadesVendidas ?? unidadesNetas) || 0;
+    const uds = Number(row.unidadesVendidas ?? row.unidadesNetas) || 0;
     agrupado[canal].unidades += uds;
-    agrupado[canal].ingresos += Number(facturacionNeta) || 0;
+    agrupado[canal].ingresos += Number(row.facturacionNeta ?? row.ingresos ?? row.facturacion) || 0;
   });
 
   contenedor.innerHTML = `<table><thead><tr><th>Canal</th><th>Unidades</th><th>Ingresos</th></tr></thead><tbody>${
