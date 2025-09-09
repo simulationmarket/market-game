@@ -367,24 +367,79 @@ if (!partidaObj.service) {
       if (partida.players[playerName]) {
         partida.players[playerName].prepared = true;
 
-        // 1) Guardar decisiones del HUMANO
-        partida.players[playerName].gameState.roundDecisions = {
-          products: products.map(product => ({
-            caracteristicas: product.caracteristicas,
-            precio: product.precio,
-            posicionamientoCalidad: product.calidad,
-            posicionamientoPrecio: product.posicionamientoPrecio,
-            presupuestoPublicidad: product.publicidad,
-            stock: product.stock,
-            unidadesFabricar: product.unidadesFabricar
-          })),
-          canalesDistribucion: {
-            granDistribucion: canalesDistribucion.granDistribucion || 0,
-            minoristas: canalesDistribucion.minoristas || 0,
-            online: canalesDistribucion.online || 0,
-            tiendaPropia: canalesDistribucion.tiendaPropia || 0
-          }
-        };
+        /// 1) Guardar decisiones del HUMANO (y cobrar precargadas si no interactuó)
+const pj = partida.players[playerName];
+const gs = pj.gameState || (pj.gameState = {});
+
+// Persistimos las decisiones recibidas para esta ronda
+gs.roundDecisions = {
+  products: products.map(product => ({
+    caracteristicas: product.caracteristicas,
+    precio: product.precio,
+    posicionamientoCalidad: product.calidad,
+    posicionamientoPrecio: product.posicionamientoPrecio,
+    presupuestoPublicidad: product.publicidad,
+    stock: product.stock,
+    unidadesFabricar: product.unidadesFabricar
+  })),
+  canalesDistribucion: {
+    granDistribucion: canalesDistribucion.granDistribucion || 0,
+    minoristas:       canalesDistribucion.minoristas       || 0,
+    online:           canalesDistribucion.online           || 0,
+    tiendaPropia:     canalesDistribucion.tiendaPropia     || 0
+  }
+};
+
+// === COBRO AUTOMÁTICO DE DECISIONES PRECARGADAS =======================
+// Si el jugador NO ha entrado en la pantalla de decisiones esta ronda
+// (gs.interactuadoEnRonda !== gs.round), cobramos el coste aquí.
+const rondaActual = Number(gs.round ?? 0);
+const yaProcesada = Number(gs.interactuadoEnRonda ?? -1) === rondaActual;
+
+if (!yaProcesada) {
+  // Usamos los productos/canales de la petición; si vinieran vacíos,
+  // caemos al estado que ya tiene el servidor en gameState.
+  const productosParaCoste = (Array.isArray(products) && products.length)
+    ? products
+    : (gs.products || []);
+
+  const canalesParaCoste = Object.assign(
+    { granDistribucion: 0, minoristas: 0, online: 0, tiendaPropia: 0 },
+    (canalesDistribucion && Object.keys(canalesDistribucion).length)
+      ? canalesDistribucion
+      : (gs.canalesDistribucion || {})
+  );
+
+  // Costes por canal (mismos que usas en la UI de decisiones)
+  const COSTE_CANALES = {
+    granDistribucion: 75000,
+    minoristas:      115000,
+    online:          150000,
+    tiendaPropia:    300000
+  };
+
+  // Coste de fabricación y publicidad (igual que hace el cliente)
+  const gastoFabricacion = productosParaCoste.reduce((acc, p) =>
+    acc + (Number(p.unidadesFabricar) || 0) * (Number(p.costeUnitarioEst) || 0)
+  , 0);
+
+  const gastoPublicidad = productosParaCoste.reduce((acc, p) =>
+    acc + (Number(p.publicidad ?? p.presupuestoPublicidad) || 0)
+  , 0);
+
+  const gastoCanales = Object.entries(COSTE_CANALES).reduce((acc, [k, coste]) =>
+    acc + ((Number(canalesParaCoste[k]) || 0) * coste)
+  , 0);
+
+  const gastoTotal = gastoFabricacion + gastoPublicidad + gastoCanales;
+
+  // Aplica el cobro en servidor e idempotencia marcando la ronda como "interactuada"
+  gs.budget = Number(gs.budget || 0) - gastoTotal;
+  gs.interactuadoEnRonda = rondaActual;
+
+  console.log(`[Cobro auto] ${playerName} r${rondaActual} → fab=${gastoFabricacion}, pub=${gastoPublicidad}, canales=${gastoCanales}, total=${gastoTotal}. Budget=${gs.budget}`);
+}
+
 
         // Persistir decisión HUMANO
         const service = getPartidaState(registry, partidaId).service;

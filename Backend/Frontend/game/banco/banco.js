@@ -1,14 +1,74 @@
 // /Frontend/game/banco/banco.js
 
+// ==== banco.js (añade estas utilidades al principio del archivo) ====
+const formatMonedaES = (num) =>
+  new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+    Number.isFinite(num) ? num : 0
+  );
+
+// Acepta "12.345,67", "12345.67", "12345", etc. Devuelve Number (en euros)
+const parseMonedaES = (str) => {
+  if (str == null) return 0;
+  let s = String(str).trim();
+  if (!s) return 0;
+  // Elimina símbolos/espacios
+  s = s.replace(/[^\d.,-]/g, '');
+  // Si hay coma, se asume como decimal y se quitan puntos de miles
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Enlaza formateo en vivo al input (mantiene valor numérico en data-value)
+function attachCurrencyFormatter(input) {
+  if (!input) return;
+
+  // Formatea cuando sale del campo (evita saltos de cursor raros)
+  input.addEventListener('blur', () => {
+    const val = parseMonedaES(input.value);
+    input.dataset.value = String(val);
+    input.value = formatMonedaES(val); // "1.234,56"
+  });
+
+  // Formateo "suave" mientras escribe: solo limpia caracteres inválidos,
+  // permite escribir coma/decimales; al blur se fija a 2 decimales.
+  input.addEventListener('input', () => {
+    const caret = input.selectionStart ?? input.value.length;
+    const before = input.value;
+    // Permitimos dígitos, puntos y comas; quitamos el resto
+    input.value = before.replace(/[^\d.,]/g, '');
+    // Guarda el valor numérico provisional (normalizado)
+    input.dataset.value = String(parseMonedaES(input.value));
+    // Intenta preservar el cursor si no cambió la longitud
+    const delta = input.value.length - before.length;
+    const pos = Math.max(0, caret + delta);
+    if (typeof input.setSelectionRange === 'function') {
+      input.setSelectionRange(pos, pos);
+    }
+  });
+
+  // Al enfocar, muestra el valor "crudo" con coma decimal para edición cómoda
+  input.addEventListener('focus', () => {
+    const val = parseFloat(input.dataset.value || '0');
+    input.value = Number.isFinite(val) ? String(val).replace('.', ',') : '';
+    input.select();
+  });
+
+  // Inicializa si viene con valor del servidor
+  const inicial = parseMonedaES(input.value || input.dataset.value || '0');
+  input.dataset.value = String(inicial);
+  input.value = formatMonedaES(inicial);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io('/', {
-  path: '/socket.io',
-  transports: ['websocket', 'polling'],  // ✅ permite fallback
-  withCredentials: true,
-  reconnection: true,
-  reconnectionAttempts: 5,
-  timeout: 20000
-});
+    path: '/socket.io',
+    transports: ['websocket', 'polling'],  // ✅ permite fallback
+    withCredentials: true,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    timeout: 20000
+  });
 
   // === Multi-partida: obtener y preservar partidaId + playerName ===
   const params = new URLSearchParams(location.search);
@@ -34,13 +94,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====== Elementos HTML ======
   const budgetElement = document.getElementById("budgetAmount");
   const reservesElement = document.getElementById("reservesAmount");
-  const loanAmountInput = document.getElementById("loan-amount");
+  const loanAmountInput = document.getElementById("loan-amount");        // ← input con formato moneda
   const loanTermInput = document.getElementById("loan-term");
   const interestRateElement = document.getElementById("interest-rate");
   const amortizationElement = document.getElementById("amortization-per-round");
   const interestPerRoundElement = document.getElementById("interest-per-round");
   const totalPerRoundElement = document.getElementById("total-per-round");
   const loansListElement = document.querySelector("#loans-list");
+
+  // Activa formateo de moneda en el input de importe del préstamo
+  attachCurrencyFormatter(loanAmountInput);
 
   let budget = 0;
   let reserves = 0;
@@ -56,8 +119,11 @@ document.addEventListener("DOMContentLoaded", () => {
     reservesElement.textContent = formatCurrency(reserves);
   }
 
+  // → Ahora parsea el input con separadores/es-ES
   function parseLoanAmount() {
-    const amount = parseFloat(loanAmountInput.value);
+    // usa el dataset.value (número normalizado) si está disponible
+    const raw = loanAmountInput?.dataset?.value ?? loanAmountInput?.value ?? '0';
+    const amount = parseMonedaES(raw);
     return isNaN(amount) || amount <= 0 ? null : amount;
   }
 
@@ -79,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ====== Cálculo de préstamo (preview) ======
   function updateCalculations() {
-    const loanAmount = parseLoanAmount();
+    const loanAmount = parseLoanAmount();                 // ← usa parser con formato es-ES
     const loanTerm = parseInt(loanTermInput.value, 10);
 
     if (loanAmount !== null && !isNaN(loanTerm) && loanTerm > 0) {
@@ -100,12 +166,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Recalcula preview al escribir/cambiar
   loanAmountInput.addEventListener("input", updateCalculations);
   loanTermInput.addEventListener("input", updateCalculations);
+  loanAmountInput.addEventListener("blur", updateCalculations);
 
   // ====== Solicitar préstamo ======
   document.getElementById("request-loan-button").addEventListener("click", () => {
-    const loanAmount = parseLoanAmount();
+    const loanAmount = parseLoanAmount();                 // ← parser con formato es-ES
     const loanTerm = parseInt(loanTermInput.value, 10);
 
     if (loanAmount === null || isNaN(loanTerm) || loanTerm <= 0) {
@@ -114,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Nota: Mantengo tus fórmulas originales para el interés efectivo del préstamo
-    const interestRate = loanTerm <= 3 ? 0.06 : 0.06 + (loanTerm - 3) * 0.0075;
+    const interestRate = loanTerm <= 3 ? 0.06 : 0.06 + (loanTerm - 3) * 0.017;
     const amortizationPerRound = loanAmount / loanTerm;
     const interestPerRound = amortizationPerRound * interestRate;
     const totalPerRound = amortizationPerRound + interestPerRound;

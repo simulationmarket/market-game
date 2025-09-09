@@ -219,16 +219,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('addReserve').addEventListener('click', () => {
-    const cantidadAñadir = parseFloat(prompt("Introduce la cantidad que deseas añadir a las reservas:"));
-    if (isNaN(cantidadAñadir) || cantidadAñadir <= 0) {
-      alert("Por favor, introduce una cantidad válida para añadir.");
-      return;
-    }
-    reserves += cantidadAñadir;
-    budget -= cantidadAñadir;
-    updateDisplay();
-    syncWithServer();
-  });
+  const entrada = prompt("Introduce la cantidad que deseas añadir a las reservas:");
+  if (entrada === null) return; // cancelado
+
+  const cantidadAñadir = Number(entrada);
+  if (!Number.isFinite(cantidadAñadir) || cantidadAñadir <= 0) {
+    alert("Por favor, introduce una cantidad válida para añadir.");
+    return;
+  }
+
+  if (cantidadAñadir > budget) {
+    alert(`No puedes añadir a reservas más de tu presupuesto disponible (${formatCurrency(budget)}).`);
+    return;
+  }
+
+  reserves += cantidadAñadir;
+  budget  -= cantidadAñadir;
+
+  updateDisplay();
+  syncWithServer();
+});
 
   const calcularCuotasTotales = () =>
     loans.reduce((total, loan) => total + (loan.totalPerRound || 0), 0);
