@@ -84,13 +84,9 @@ mostrarRepartoPorTramoEnConsola(resultadosDetallados);
 
 // (Opcional) Ver los descartes por falta de interés
 if (Array.isArray(descartesDetallados) && descartesDetallados.length) {
-  console.log("\n[Descartes por falta de interés en tramos]");
+  
   descartesDetallados.forEach(d => {
-    console.log(
-      `Canal: ${d.canal}, ${d.tramo}, Segmento: ${d.segmento} → ` +
-      `Descartado: ${Number(d.porcentajeDescartado).toFixed(2)}% ` +
-      `(${Number(d.unidadesDescartadas).toLocaleString()} uds)`
-    );
+    
   });
 }
 
@@ -272,10 +268,8 @@ function calcularEfectoPosicionamiento(playersData) {
                 }
             }
 
-            // Log para depuración
-            console.log(`Producto: ${product.nombre}, Ratio de Posicionamiento: ${ratioPosicionamiento}`);
-            console.log(`Producto: ${product.nombre}, Efecto Posicionamiento: ${product.efectoPosicionamiento}`);
-            console.log(`Características Ajustadas:`, product.caracteristicasAjustadas);
+            
+            
         });
     }
 }
@@ -296,8 +290,7 @@ function mostrarEfectoPosicionamientoEnConsola(playersData) {
         }
 
         // Renderizar tabla de efecto de posicionamiento
-        console.log(`Nombre          | Ratio de Posicionamiento | Promedio de Características | Calidad | Efecto de Posicionamiento`);
-        console.log(`---------------------------------------------------------------------------------------------------------`);
+        
 
         productos.forEach(product => {
             console.log(
@@ -307,9 +300,7 @@ function mostrarEfectoPosicionamientoEnConsola(playersData) {
 
         console.log("\nCaracterísticas Ajustadas:");
 
-        // Renderizar tabla de características ajustadas
-        console.log(`Nombre          | Pantalla  | Procesador | Batería   | Placa Base | Ergonomía | Acabados  | Color`);
-        console.log(`---------------------------------------------------------------------------------------------------------`);
+        
 
         productos.forEach(product => {
             const ajustadas = product.caracteristicasAjustadas || {};
@@ -452,10 +443,7 @@ function calcularInteresProductoSegmento(playersData, marketData) {
                     interesPromedio
                 };
 
-                // Log para depuración del segmento
-                console.log(`Producto: ${product.nombre}, Segmento: ${segmentoNombre}`);
-                console.log(`Notas de Interés:`, notasInteres);
-                console.log(`Interés Promedio: ${interesPromedio}, Promedio Producto: ${promedioProducto}, Promedio Segmento: ${promedioSegmento}`);
+                
             }
         });
     }
@@ -463,58 +451,6 @@ function calcularInteresProductoSegmento(playersData, marketData) {
 
 
 
-// Función para renderizar la nota de interés en la consola
-function renderProductInterestNote(playersData, marketData) {
-    console.log("Rendering Product interest notes for all players...");
-
-    for (const [playerName, playerData] of Object.entries(playersData)) {
-        console.log(`\nNota de Interés de ${playerName}:`);
-
-        // Acceso seguro a los productos
-        const productos = playerData.gameState?.products || [];
-        if (productos.length === 0) {
-            console.warn(`No hay productos para el jugador ${playerName}.`);
-            continue;
-        }
-
-        productos.forEach(product => {
-            console.log(`\nProducto: ${product.nombre || "N/A"}`);
-
-            // Acceso seguro al interés por segmento
-            const interesPorSegmento = product.interesPorSegmento || {};
-            if (Object.keys(interesPorSegmento).length === 0) {
-                console.warn(`No hay datos de interés para el producto ${product.nombre || "N/A"}.`);
-                return;
-            }
-
-            // Iterar sobre cada segmento para el producto
-            for (const [segmentoNombre, datosInteres] of Object.entries(interesPorSegmento)) {
-                console.log(`\nSegmento: ${segmentoNombre}`);
-
-                // Encabezado de la tabla
-                console.log("Característica     | Producto    | Segmento    | Interés");
-                console.log("----------------------------------------------------------");
-
-                // Características ajustadas, ideales y notas de interés
-                for (const caracteristica of Object.keys(datosInteres.notasInteres)) {
-                    const valorProducto = product.caracteristicasAjustadas?.[caracteristica] || "N/A";
-                    const valorSegmento = marketData.segmentos?.[segmentoNombre]?.productoIdeal?.[caracteristica] || "N/A";
-                    const interes = datosInteres.notasInteres?.[caracteristica] || "N/A";
-
-                    console.log(
-                        `${caracteristica.padEnd(17)} | ${valorProducto.toString().padEnd(11)} | ${valorSegmento.toString().padEnd(11)} | ${interes}`
-                    );
-                }
-
-                // Promedios
-                console.log("\nPromedios:");
-                console.log(`Promedio Producto: ${datosInteres.promedioProducto || "N/A"}`);
-                console.log(`Promedio Segmento: ${datosInteres.promedioSegmento || "N/A"}`);
-                console.log(`Interés Promedio: ${datosInteres.interesPromedio || "N/A"}`);
-            }
-        });
-    }
-}
 
 
 
@@ -592,8 +528,7 @@ function mostrarPriceInterestNote(playersData, marketData) {
         interesProducto              // nota de producto
     );
 
-    // <-- añade el console.log de resultado
-    console.log(`  ${segmentoNombre.padEnd(17)} | ${interesPrecio.toFixed(2)}`);
+    
 });
         });
     }
@@ -1206,83 +1141,7 @@ function consolidarVentas(resultadosDetallados) {
     return ventasConsolidadas;
 }
 
-function mostrarVentasPorCanalSegmentoEnConsola(ventasConsolidadas) {
-    console.log("Ventas Consolidadas por Canal, Jugador, Producto y Segmento:\n");
 
-    const headers = ["Canal", "Jugador", "Producto", "Profesionales", "Altos Ingresos", "Gran Consumidor", "Bajos Ingresos", "Innovadores", "Total"];
-    console.log(headers.map(header => header.padEnd(20)).join(""));
-
-    Object.entries(ventasConsolidadas || {}).forEach(([canal, data]) => {
-        // Ignorar la entrada porProducto ya que no es un canal
-        if (canal === "porProducto") {
-            return;
-        }
-
-        if (!data.productos) {
-            console.warn(`Advertencia: No hay datos de productos para el canal ${canal}.`);
-            return;
-        }
-
-        // Iterar sobre los productos para cada canal y mostrar jugador y producto
-        Object.entries(data.productos).forEach(([producto, segmentos]) => {
-            const jugador = segmentos.jugador || "Desconocido";
-
-            const row = [
-                canal.padEnd(20),
-                jugador.padEnd(20),
-                producto.padEnd(20),
-                (segmentos.profesionales || 0).toLocaleString().padStart(20),
-                (segmentos.altosIngresos || 0).toLocaleString().padStart(20),
-                (segmentos.granConsumidor || 0).toLocaleString().padStart(20),
-                (segmentos.bajosIngresos || 0).toLocaleString().padStart(20),
-                (segmentos.innovadores || 0).toLocaleString().padStart(20),
-                (segmentos.total || 0).toLocaleString().padStart(20)
-            ];
-            console.log(row.join(""));
-        });
-    });
-
-    console.log("\nFin de las ventas consolidadas por canal.\n");
-}
-
-function mostrarVentasPorCanalSegmentoEnConsola(ventasConsolidadas) {
-    console.log("Ventas Consolidadas por Canal, Jugador, Producto y Segmento:\n");
-
-    const headers = ["Canal", "Jugador", "Producto", "Profesionales", "Altos Ingresos", "Gran Consumidor", "Bajos Ingresos", "Innovadores", "Total"];
-    console.log(headers.map(header => header.padEnd(20)).join(""));
-
-    Object.entries(ventasConsolidadas || {}).forEach(([canal, data]) => {
-        // Ignorar la entrada porProducto ya que no es un canal
-        if (canal === "porProducto") {
-            return;
-        }
-
-        if (!data.productos) {
-            console.warn(`Advertencia: No hay datos de productos para el canal ${canal}.`);
-            return;
-        }
-
-        // Iterar sobre los productos para cada canal y mostrar jugador y producto
-        Object.entries(data.productos).forEach(([producto, segmentos]) => {
-            const jugador = segmentos.jugador || "Desconocido";
-
-            const row = [
-                canal.padEnd(20),
-                jugador.padEnd(20),
-                producto.padEnd(20),
-                (segmentos.profesionales || 0).toLocaleString().padStart(20),
-                (segmentos.altosIngresos || 0).toLocaleString().padStart(20),
-                (segmentos.granConsumidor || 0).toLocaleString().padStart(20),
-                (segmentos.bajosIngresos || 0).toLocaleString().padStart(20),
-                (segmentos.innovadores || 0).toLocaleString().padStart(20),
-                (segmentos.total || 0).toLocaleString().padStart(20)
-            ];
-            console.log(row.join(""));
-        });
-    });
-
-    console.log("\nFin de las ventas consolidadas por canal.\n");
-}
 
 
 
@@ -1424,95 +1283,7 @@ function calcularDemandaPorSegmentoCanal(resultadosDetallados) {
 }
 
 
-function mostrarDemandaPorSegmentoCanal(demandaPorSegmentoCanal) {
-    console.log("Demanda por Segmento y Canal:\n");
 
-    // Validación inicial
-    if (Object.keys(demandaPorSegmentoCanal).length === 0) {
-        console.warn("Advertencia: No hay datos de demanda por segmento y canal para mostrar.");
-        return;
-    }
-
-    const colWidths = {
-        jugador: 12,
-        producto: 12,
-        canal: 20,
-        segmento: 15,
-        total: 15
-    };
-
-    // Encabezado de la tabla
-    const encabezado = [
-        "Jugador".padEnd(colWidths.jugador),
-        "Producto".padEnd(colWidths.producto),
-        "Canal".padEnd(colWidths.canal),
-        "Profesionales".padEnd(colWidths.segmento),
-        "Altos Ingresos".padEnd(colWidths.segmento),
-        "Gran Consumidor".padEnd(colWidths.segmento),
-        "Bajos Ingresos".padEnd(colWidths.segmento),
-        "Innovadores".padEnd(colWidths.segmento),
-        "Total Canal".padEnd(colWidths.total)
-    ];
-    console.log(encabezado.join(" "));
-    console.log("-".repeat(encabezado.join(" ").length));
-
-    Object.entries(demandaPorSegmentoCanal).forEach(([jugador, productos]) => {
-        console.log(`\n${jugador.padEnd(colWidths.jugador)}`);
-        Object.entries(productos).forEach(([producto, canales]) => {
-            console.log(`  ${producto.padEnd(colWidths.producto)}`);
-
-            const totalPorSegmento = {
-                profesionales: 0,
-                altosIngresos: 0,
-                granConsumidor: 0,
-                bajosIngresos: 0,
-                innovadores: 0,
-                totalCanal: 0
-            };
-
-            Object.entries(canales).forEach(([canal, segmentos]) => {
-                const row = [
-                    "".padEnd(colWidths.jugador),
-                    "".padEnd(colWidths.producto),
-                    canal.padEnd(colWidths.canal),
-                    (segmentos.profesionales || 0).toFixed(2).padEnd(colWidths.segmento),
-                    (segmentos.altosIngresos || 0).toFixed(2).padEnd(colWidths.segmento),
-                    (segmentos.granConsumidor || 0).toFixed(2).padEnd(colWidths.segmento),
-                    (segmentos.bajosIngresos || 0).toFixed(2).padEnd(colWidths.segmento),
-                    (segmentos.innovadores || 0).toFixed(2).padEnd(colWidths.segmento),
-                    (segmentos.totalCanal || 0).toFixed(2).padEnd(colWidths.total)
-                ];
-
-                console.log(row.join(" "));
-
-                // Agregar a los totales por segmento
-                totalPorSegmento.profesionales += segmentos.profesionales || 0;
-                totalPorSegmento.altosIngresos += segmentos.altosIngresos || 0;
-                totalPorSegmento.granConsumidor += segmentos.granConsumidor || 0;
-                totalPorSegmento.bajosIngresos += segmentos.bajosIngresos || 0;
-                totalPorSegmento.innovadores += segmentos.innovadores || 0;
-                totalPorSegmento.totalCanal += segmentos.totalCanal || 0;
-            });
-
-            // Mostrar totales por segmento para el producto
-            const totalRow = [
-                "".padEnd(colWidths.jugador),
-                "".padEnd(colWidths.producto),
-                "Total Segmento".padEnd(colWidths.canal),
-                totalPorSegmento.profesionales.toFixed(2).padEnd(colWidths.segmento),
-                totalPorSegmento.altosIngresos.toFixed(2).padEnd(colWidths.segmento),
-                totalPorSegmento.granConsumidor.toFixed(2).padEnd(colWidths.segmento),
-                totalPorSegmento.bajosIngresos.toFixed(2).padEnd(colWidths.segmento),
-                totalPorSegmento.innovadores.toFixed(2).padEnd(colWidths.segmento),
-                totalPorSegmento.totalCanal.toFixed(2).padEnd(colWidths.total)
-            ];
-
-            console.log(totalRow.join(" "));
-        });
-    });
-
-    console.log("\n");
-}
 
 
 function calcularRepartoVentasProporcional(playersData, ventasDisponibilidad, demandaPorSegmentoCanal) {
@@ -1575,78 +1346,7 @@ function calcularRepartoVentasProporcional(playersData, ventasDisponibilidad, de
 
 
 
-function mostrarRepartoVentasProporcionalEnConsola(resultadosReparto) {
-    console.log("Reparto de Ventas Proporcional por Canal y Segmento:\n");
-
-    // Validación inicial de entrada
-    if (!Array.isArray(resultadosReparto) || resultadosReparto.length === 0) {
-        console.warn("Advertencia: No hay resultados de reparto de ventas para mostrar.");
-        return;
-    }
-
-    const colWidths = {
-        jugador: 12,
-        producto: 12,
-        canal: 15,
-        segmento: 15,
-        demanda: 18,
-        fraccionDemanda: 20,
-        unidadesRecibidas: 20,
-        unidadesNoVendidas: 20
-    };
-
-    // Encabezado de la tabla
-    const encabezado = [
-        "Jugador".padEnd(colWidths.jugador),
-        "Producto".padEnd(colWidths.producto),
-        "Canal".padEnd(colWidths.canal),
-        "Segmento".padEnd(colWidths.segmento),
-        "Demanda".padEnd(colWidths.demanda),
-        "Fracción Demanda".padEnd(colWidths.fraccionDemanda),
-        "Unidades Recibidas".padEnd(colWidths.unidadesRecibidas),
-        "Unidades No Vendidas".padEnd(colWidths.unidadesNoVendidas)
-    ];
-
-    console.log(encabezado.join(" "));
-    console.log("-".repeat(Object.values(colWidths).reduce((a, b) => a + b, 0))); // Línea de separación
-
-    let totalDemanda = 0;
-    let totalUnidadesRecibidas = 0;
-    let totalUnidadesNoVendidas = 0;
-
-    // Filas de datos alineadas y cálculo de totales
-    resultadosReparto.forEach(data => {
-        const row = [
-            (data.jugador || "Desconocido").padEnd(colWidths.jugador),
-            (data.producto || "Producto desconocido").padEnd(colWidths.producto),
-            (data.canal || "Sin canal").padEnd(colWidths.canal),
-            (data.segmento || "Sin segmento").padEnd(colWidths.segmento),
-            parseFloat(data.demanda || 0).toFixed(2).padStart(colWidths.demanda),
-            parseFloat(data.fraccionDemanda || 0).toFixed(4).padStart(colWidths.fraccionDemanda),
-            parseFloat(data.unidadesRecibidas || 0).toFixed(2).padStart(colWidths.unidadesRecibidas),
-            parseFloat(data.unidadesNoVendidas || 0).toFixed(2).padStart(colWidths.unidadesNoVendidas)
-        ];
-        console.log(row.join(" "));
-
-        // Acumular totales
-        totalDemanda += parseFloat(data.demanda) || 0;
-        totalUnidadesRecibidas += parseFloat(data.unidadesRecibidas) || 0;
-        totalUnidadesNoVendidas += parseFloat(data.unidadesNoVendidas) || 0;
-    });
-
-    // Fila de totales al final
-    const totalRow = [
-        "Total".padEnd(colWidths.jugador + colWidths.producto + colWidths.canal + colWidths.segmento),
-        totalDemanda.toFixed(2).padStart(colWidths.demanda),
-        "".padEnd(colWidths.fraccionDemanda),
-        totalUnidadesRecibidas.toFixed(2).padStart(colWidths.unidadesRecibidas),
-        totalUnidadesNoVendidas.toFixed(2).padStart(colWidths.unidadesNoVendidas)
-    ];
-
-    console.log(totalRow.join(" "));
-    console.log("\n");
-}
-
+f
 
 
 function calcularPenalizacionPorInteres(playersData) {
@@ -1762,24 +1462,9 @@ function mostrarResultadosFinales(resultadosFinales) {
         
     };
 
-    console.log("Resultados Finales con Penalización por Canal y Segmento:\n");
-    const encabezado = [
-        "Jugador".padEnd(colWidths.jugador),
-        "Producto".padEnd(colWidths.producto),
-        "Canal".padEnd(colWidths.canal),
-        "Segmento".padEnd(colWidths.segmento),
-        "Demanda".padEnd(colWidths.demanda), // Nueva columna
-        "Unidades Recibidas".padEnd(colWidths.unidadesRecibidas),
-        "Unidades Vendidas".padEnd(colWidths.unidadesVendidas),
-        "Excedente".padEnd(colWidths.excedente),
-        "% Devoluciones".padEnd(colWidths.porcentajeDevoluciones),
-        "Unidades Devueltas".padEnd(colWidths.unidadesDevueltas),
-        "Unidades Netas".padEnd(colWidths.unidadesNetas),
-        "Totales No Vendidas".padEnd(colWidths.totalesNoVendidas),
+    
         
-    ];
-    console.log(encabezado.join(" "));
-    console.log("-".repeat(Object.values(colWidths).reduce((a, b) => a + b, 0)));
+    
 
     resultadosFinales.forEach(data => {
         const costeUnitarioReal = calcularCosteReal(data.costeUnitario || 0, data.unidadesFabricar || 0);
