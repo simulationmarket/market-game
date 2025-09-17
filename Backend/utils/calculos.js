@@ -1346,8 +1346,6 @@ function calcularRepartoVentasProporcional(playersData, ventasDisponibilidad, de
 
 
 
-f
-
 
 function calcularPenalizacionPorInteres(playersData) {
     const penalizacionPorProducto = {};
