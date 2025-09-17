@@ -475,7 +475,8 @@ if (!yaProcesada) {
             })),
             canalesDistribucion: decisiones.canalesDistribucion
           };
-
+           console.log(`[BOT ${botName}] decisiones r${bot.gameState.round}:`,
+            JSON.stringify(bot.gameState.roundDecisions, null, 2));
           // Persistir decisión BOT
           const service = getPartidaState(registry, partidaId).service;
           service?.guardarDecision({
