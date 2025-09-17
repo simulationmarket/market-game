@@ -38,7 +38,7 @@ function tomarDecisionesPrimeraRonda(nombreBot, dificultad, gameState, marketDat
     const precioRef = calcularPrecioOptimo(marketData.segmentos[segmentoObjetivo]);
     const precio = aplicarRuidoDificultad(precioRef, dificultad);
 
-    const calidad = decidirCalidadPorSegmento(segmentoObjetivo, marketData, dificultad);
+    const calidad = decidirCalidadPorSegmento(segmentoObjetivo, marketData, dificultad, producto);
     const posicionamientoPrecio = Math.max(1, Math.round(precio / 50)); // compatible con calculos.js
 
     const publicidad = decidirPublicidadPrimeraRonda(presupuestoWrapper);
@@ -105,7 +105,8 @@ function tomarDecisionesRondasPosteriores(
       }
     );
 
-    const calidad = decidirCalidadPorSegmento(segmentoNuevo, marketData, dificultad);
+    const calidad = decidirCalidadPorSegmento(segmentoNuevo, marketData, dificultad, producto);
+
     const posicionamientoPrecio = decidirPosicionamientoPrecio(producto, precio, preciosPercibidos);
 
     const publicidad = decidirPublicidad(producto, resultadosAnteriores, presupuestoWrapper);
@@ -385,17 +386,46 @@ function decidirUnidadesAFabricar(producto, demandaEstimada, stockPrevio, dificu
 /* ===================  CALIDAD / PUBLICIDAD / POSPRECIO  ================= */
 /* ======================================================================== */
 
-function decidirCalidadPorSegmento(segmentoNombre, marketData, dificultad) {
-  const idealProm = Number(marketData.segmentos?.[segmentoNombre]?.productoIdeal?.promedio || 5);
+// Reemplaza la función existente:
+function decidirCalidadPorSegmento(segmentoNombre, marketData, dificultad, producto = null) {
+  const ideal = marketData.segmentos?.[segmentoNombre]?.productoIdeal || {};
+  const idealProm = clamp(Number(ideal.promedio ?? 12), 1, 20);
+
+  // Evita saturar en 20 en la primera ronda
+  const cap = 19;                  // deja "aire" arriba
+  let base = Math.min(cap, idealProm);
+
+  // Ruido según dificultad (escala 1–20)
   let ruido = 0;
-  if (dificultad === 'facil')   ruido = (Math.random() * 1.0) - 0.5;
-  if (dificultad === 'normal')  ruido = (Math.random() * 0.6) - 0.3;
-  if (dificultad === 'dificil') ruido = (Math.random() * 0.3) - 0.15;
-  return Math.max(0, Math.min(10, Math.round(idealProm + ruido)));
+  if (dificultad === 'facil')   ruido = (Math.random() * 4.0) - 2.0;   // ±2.0
+  else if (dificultad === 'dificil') ruido = (Math.random() * 1.2) - 0.6; // ±0.6
+  else                           ruido = (Math.random() * 2.4) - 1.2; // ±1.2 (normal)
+
+  let val = base + ruido;
+
+  // (Opcional) si pasas el producto, reduce la calidad si el producto está lejos del ideal
+  if (producto) {
+    const keys = Object.keys(ideal).filter(k => k !== 'promedio');
+    const dist = keys.length
+      ? keys.reduce((s,k)=>{
+          const vp = Number(producto.caracteristicas?.[k] ?? ideal[k] ?? 10);
+          const vi = Number(ideal[k] ?? 10);
+          return s + Math.abs(vp - vi) / 20; // normaliza a [0..1]
+        }, 0) / keys.length
+      : 0.5;
+
+    // Si estás lejos (dist≈1), baja hasta ~3 puntos; si estás cerca, casi no toca
+    val -= 3 * dist;
+  }
+
+  return clamp(Math.round(val), 1, 20);
 }
 
+function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+
 function decidirPublicidadPrimeraRonda(presupuestoWrapper) {
-  const pct = 0.06;
+  const pct = 0.02;
   const gasto = Math.round(Math.min(presupuestoWrapper.valor * pct, presupuestoWrapper.valor));
   presupuestoWrapper.valor = Math.max(0, presupuestoWrapper.valor - gasto);
   return gasto;
