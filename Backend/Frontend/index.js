@@ -1,8 +1,3 @@
-// index.js (lobby) — Koyeb/multipartida ready
-
-// ⚠️ Si en producción el backend está en OTRO dominio, pon la URL explícita:
-// const socket = io("https://tuapp.koyeb.app", {
-
 const BACKEND_URL =
   (typeof localStorage !== 'undefined' && localStorage.getItem('BACKEND_URL')) ||
   (typeof window !== 'undefined' ? window.location.origin : '/');
@@ -11,19 +6,22 @@ console.log('[socket] conectando a:', BACKEND_URL);
 
 const socket = io(BACKEND_URL, {
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
+  transports: ['polling'],   // ← SOLO polling
   withCredentials: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000
 });
 
-
+// Logs de diagnóstico
 console.log('transporte inicial:', socket.io.engine.transport.name);
 socket.io.engine.on('upgrade', () => {
   console.log('upgrade a:', socket.io.engine.transport.name);
 });
-socket.on('connect_error', e => console.log('[connect_error]', e?.message));
+socket.on('connect_error', (e) => {
+  console.log('[connect_error]', e?.message, e);
+});
+
 
 // --- Elementos de la UI ---
 const playerNameInput = document.getElementById("playerName");

@@ -88,10 +88,10 @@ app.use('/db', dbLimiter);
 // Socket.IO: ruta explícita, CORS alineado con Express, sin compresión del handshake
 const io = new Server(server, {
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
+  transports: ['polling'],   // ← SOLO polling
+  allowUpgrades: false,      // ← desactiva upgrade a WS
   cors: {
     origin: (origin, cb) => {
-      // Igual que Express: permitimos same-origin/curl (sin origin)
       if (!origin) return cb(null, true);
       if (!allowedOrigins.length || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
         return cb(null, true);
