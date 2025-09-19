@@ -2,10 +2,16 @@
 
 // ⚠️ Si en producción el backend está en OTRO dominio, pon la URL explícita:
 // const socket = io("https://tuapp.koyeb.app", {
+
+const BACKEND_URL =
+  (typeof localStorage !== 'undefined' && localStorage.getItem('BACKEND_URL')) ||
+  (typeof window !== 'undefined' ? window.location.origin : '/');
+
+console.log('[socket] conectando a:', BACKEND_URL);
+
 const socket = io(BACKEND_URL, {
   path: '/socket.io',
-  // Arranca en polling y luego hace upgrade a websocket
-  transports: ['polling', 'websocket'],
+  transports: ['websocket', 'polling'],
   withCredentials: true,
   reconnection: true,
   reconnectionAttempts: 5,
