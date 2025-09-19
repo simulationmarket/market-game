@@ -2,14 +2,16 @@
 
 // ⚠️ Si en producción el backend está en OTRO dominio, pon la URL explícita:
 // const socket = io("https://tuapp.koyeb.app", {
-const socket = io('/', {
+const socket = io(BACKEND_URL, {
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
+  // Arranca en polling y luego hace upgrade a websocket
+  transports: ['polling', 'websocket'],
   withCredentials: true,
   reconnection: true,
   reconnectionAttempts: 5,
   timeout: 20000
 });
+
 
 console.log('transporte inicial:', socket.io.engine.transport.name);
 socket.io.engine.on('upgrade', () => {
