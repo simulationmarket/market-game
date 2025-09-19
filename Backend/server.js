@@ -10,16 +10,19 @@ const fs = require('fs');
 const os = require('os');
 
 // Seguridad y rendimiento (recomendado)
-let compression, helmet, cors;
+let compression, helmet, cors, rateLimit;
 try {
   compression = require('compression');
   helmet = require('helmet');
   cors = require('cors');
+  rateLimit = require('express-rate-limit');
 } catch (_) {
   compression = () => (req, res, next) => next();
   helmet = () => (req, res, next) => next();
   cors = () => (req, res, next) => next();
+  rateLimit = () => (req, res, next) => next();
 }
+
 
 // ====== Imports de tu app (ajusta rutas si difieren) ======
 const handlePlayerSockets = require('./sockets/playersSocket');
@@ -74,19 +77,35 @@ app.use(cors({
 }));
 
 const server = http.createServer(app);
-
-// Socket.IO: ruta explícita, CORS laxo, sin compresión del handshake
+// Rate limit sólo para endpoints de depuración (/db/*)
+const dbLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 30,             // hasta 30 req/min por IP
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/db', dbLimiter);
+// Socket.IO: ruta explícita, CORS alineado con Express, sin compresión del handshake
 const io = new Server(server, {
   path: '/socket.io',
   transports: ['websocket', 'polling'],
   cors: {
-    origin: true,            // acepta el Origin que venga (tu dominio Koyeb)
+    origin: (origin, cb) => {
+      // Igual que Express: permitimos same-origin/curl (sin origin)
+      if (!origin) return cb(null, true);
+      if (!allowedOrigins.length || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return cb(null, true);
+      }
+      return cb(new Error('Not allowed by CORS (WS)'));
+    },
     credentials: true
   },
-  httpCompression: false,    // evita rarezas de proxies con el upgrade
+  httpCompression: false,
   pingInterval: 25000,
   pingTimeout: 20000
 });
+
+
 
 // Logs útiles para ver si hace upgrade y por qué falla si falla
 io.engine.on('connection_error', (err) => {

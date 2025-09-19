@@ -715,43 +715,80 @@ if (partida.resultadosCompletosCache?.length) {
       }
     });
 
-    /* ---- 9) Actualización de estado por el cliente ---- */
-    socket.on("updatePlayerData", ({ playerName, playerData }) => {
-      const partidaId = socket.data.partidaId || 'default';
-      const partida = getPartidaState(registry, partidaId);
+    /* ---- 9) Actualización de estado por el cliente (endurecida) ---- */
+// Solo aceptamos INPUTS DE DECISIÓN de UI: products[] (campos permitidos) y canalesDistribucion.
+// Todo lo contable/derivado (budget, reserves, loans, projects, roundsHistory, valorAccion, etc.) se ignora.
+socket.on("updatePlayerData", ({ playerName, playerData = {} }) => {
+  const partidaId = socket.data.partidaId || 'default';
+  const partida = getPartidaState(registry, partidaId);
 
-      // ★ Anti-suplantación
-      try { ensureAuthOrThrow(socket, partida, playerName, 'updatePlayerData'); } catch { return; }
+  // ★ Anti-suplantación
+  try { ensureAuthOrThrow(socket, partida, playerName, 'updatePlayerData'); } catch { return; }
 
-      if (partida.players[playerName] && partida.players[playerName].gameState) {
-        const currentGameState = partida.players[playerName].gameState;
+  const pj = partida.players[playerName];
+  const gs = pj && pj.gameState;
+  if (!gs) {
+    console.error(`Error al actualizar: jugador ${playerName} no encontrado o sin gameState [${partidaId}].`);
+    return;
+  }
 
-        const existingProducts = currentGameState.products || [];
-        const newProducts = playerData.products || [];
+  // --- 1) Sanitizar productos (whitelist de campos permitidos) ---
+  const allowNum = (v, min = 0) => {
+    const n = Number(v);
+    return isFinite(n) && n >= min ? n : 0;
+  };
+  const clampInt = (v, min = 0, max = 999999999) => {
+    const n = Math.floor(Number(v));
+    return isFinite(n) ? Math.min(Math.max(n, min), max) : 0;
+  };
+  const sanitizeCaracteristicas = (car = {}) => {
+    const keys = ["pantalla","procesador","bateria","placaBase","ergonomia","acabados","color"];
+    const out = {};
+    for (const k of keys) out[k] = clampInt(car?.[k], 1, 20);
+    return out;
+  };
+  const sanitizeProduct = (p = {}) => ({
+    nombre: String(p.nombre || "").trim() || `Producto ${Date.now()}`,
+    descripcion: String(p.descripcion || ""),
+    caracteristicas: sanitizeCaracteristicas(p.caracteristicas || {}),
+    calidad: allowNum(p.calidad, 0),
+    posicionamientoPrecio: allowNum(p.posicionamientoPrecio, 0),
+    precio: allowNum(p.precio, 0),
+    publicidad: allowNum(p.publicidad, 0),
+    unidadesFabricar: clampInt(p.unidadesFabricar, 0),
+    // Todos los derivados (ratioPosicionamiento, pvp, precioAjustado, etc.) se recalcularán en el servidor
+  });
 
-        const productMap = new Map();
-        existingProducts.forEach(product => productMap.set(product.nombre, product));
-        newProducts.forEach(product => productMap.set(product.nombre, product));
+  // Unir por nombre: los existentes + los entrantes saneados (sin crear duplicados de nombre)
+  const existing = Array.isArray(gs.products) ? gs.products : [];
+  const incoming = Array.isArray(playerData.products) ? playerData.products.map(sanitizeProduct) : [];
+  const map = new Map(existing.map(p => [String(p.nombre).trim(), { ...p }]));
+  for (const p of incoming) map.set(String(p.nombre).trim(), { ...(map.get(String(p.nombre).trim()) || {}), ...p });
+  gs.products = Array.from(map.values());
 
-        partida.players[playerName].gameState = {
-          ...currentGameState,
-          budget: playerData.budget !== undefined ? playerData.budget : currentGameState.budget,
-          reserves: playerData.reserves !== undefined ? playerData.reserves : currentGameState.reserves,
-          loans: playerData.loans !== undefined ? playerData.loans : currentGameState.loans,
-          projects: playerData.projects !== undefined ? playerData.projects : currentGameState.projects,
-          canalesDistribucion: playerData.canalesDistribucion !== undefined ? playerData.canalesDistribucion : currentGameState.canalesDistribucion,
-          products: Array.from(productMap.values()),
-          interactuadoEnRonda: playerData.interactuadoEnRonda !== undefined ? playerData.interactuadoEnRonda : currentGameState.interactuadoEnRonda, // ★ nombre consistente
-        };
+  // --- 2) Sanitizar canales de distribución ---
+  if (playerData.canalesDistribucion && typeof playerData.canalesDistribucion === 'object') {
+    const cd = playerData.canalesDistribucion;
+    gs.canalesDistribucion = {
+      granDistribucion: allowNum(cd.granDistribucion, 0),
+      minoristas:       allowNum(cd.minoristas, 0),
+      online:           allowNum(cd.online, 0),
+      tiendaPropia:     allowNum(cd.tiendaPropia, 0),
+    };
+  }
 
-        console.log(`Datos actualizados para ${playerName} [${partidaId}]:`, {
-          budget: partida.players[playerName].gameState.budget,
-          products: partida.players[playerName].gameState.products.length
-        });
-      } else {
-        console.error(`Error al actualizar los datos para ${playerName}. Jugador no encontrado.`);
-      }
-    });
+  // --- 3) Marcar interacción en la ronda actual (para cobros automáticos si aplica) ---
+  gs.interactuadoEnRonda = gs.round ?? 0;
+
+  // ⚠️ Campos sensibles enviados por el cliente se ignorarán silenciosamente
+  // (budget, reserves, loans, projects, roundsHistory, valorAccion, etc.)
+
+  // --- 4) Confirmar a este cliente su estado sincronizado ---
+  socket.emit("syncPlayerData", gs);
+
+  console.log(`[SEC] updatePlayerData saneado para ${playerName} [${partidaId}] -> products:${gs.products.length}`);
+});
+
 
     /* ---- 10) Proyectos y productos ---- */
     socket.on("lanzarProyecto", (data) => {
