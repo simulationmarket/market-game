@@ -88,8 +88,7 @@ app.use('/db', dbLimiter);
 // Socket.IO: ruta explícita, CORS alineado con Express, sin compresión del handshake
 const io = new Server(server, {
   path: '/socket.io',
-  transports: ['polling'],   // ← SOLO polling
-  allowUpgrades: false,      // ← desactiva upgrade a WS
+  transports: ['polling'], // ← solo polling (estable con proxies)
   cors: {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
@@ -99,11 +98,9 @@ const io = new Server(server, {
       return cb(new Error('Not allowed by CORS (WS)'));
     },
     credentials: true
-  },
-  httpCompression: false,
-  pingInterval: 25000,
-  pingTimeout: 20000
+  }
 });
+
 
 
 
